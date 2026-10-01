@@ -51,6 +51,37 @@ Full database restore (also discards everything else written since 11:02 on
 
     ssh wp-eu 'sudo /usr/local/lib/kenmore-ops/wp alverix db import /var/backups/kenmore-ops/alverix/20261001-110240-before.sql'
 
+## 2026-10-01 (later): section rebuilt with an Image Carousel
+
+Same write path as above. The first version (three stacked rows) was replaced; the
+seven original containers are still byte-identical to `alverix-page11-elementor-before.json`.
+
+**What it is now** (element ids `a7d31f0`–`a7d31f9`, CSS id `match-trader`)
+- Container settings copied from the existing `c0ad78c` section (and its inner
+  `7a009d4` / `f0e3691` / column containers).
+- Row 1: heading and paragraph left, desktop image (691) right. Text unchanged.
+- Row 2: Elementor Image Carousel of 692, 693, 694, 695. Three per view on desktop,
+  two on tablet, one on mobile; dots, no arrows, no autoplay, captions on.
+- Captions come from the attachment caption (`post_excerpt`), set on 692–695:
+  "Tablet", "Mobile app", "Order ticket", "Analytics".
+- An HTML widget (`a7d31f9`) holds one `<style>` rule giving every slide image the
+  same height (420px, 340px under 768px) with `object-fit: contain`. Without it the
+  tall phone screens stretch the carousel. Elementor free has no control for this.
+
+**Checked** with `~/ops/tools/shot` at 1440 and 390; two rounds (round 1 had unequal
+slide heights). Final screenshots on the ops machine:
+`/srv/incoming/alverix/review/platform-match-trader-1440.png` and `-390.png`. The dark
+band across them is the site's fixed bottom ticker, not part of the section.
+
+**Database exports for this change**
+- Before: `/var/backups/kenmore-ops/alverix/20261001-124406-before.sql`
+- After: `/var/backups/kenmore-ops/alverix/20261001-124406-after.sql`
+
+`alverix-page11-elementor-after.json` in this repo is now the carousel version. The
+revert commands above still apply and remove the whole section; the full-restore
+alternative for this change is the `20261001-124406-before.sql` export, which goes
+back to the first (stacked) version.
+
 ## Working notes (2026-10-01)
 - `sudo /usr/local/lib/kenmore-ops/wp alverix …` runs wp-cli as user `alverix`. Exports
   go to `/var/backups/kenmore-ops/alverix/`, which `claude` cannot list.
