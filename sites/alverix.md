@@ -107,6 +107,20 @@ back to the first (stacked) version.
 
   `alverix-page11-elementor-after.json` is the current page data.
 
+## 2026-10-01 13:40: Match-Trader section moved up
+
+- The `a7d31f0` (`#match-trader`) container moved from last to second in page 11's
+  `_elementor_data`, directly under the hero. Order is now: hero, Match-Trader,
+  instruments, accounts table image, "Everything You Need", mobile section, "best way
+  to access", call-to-action. Contents of every container are unchanged.
+- Screenshots: `/srv/incoming/alverix/review/platform-full-{1440,390}.png`.
+- Exports: `/var/backups/kenmore-ops/alverix/20261001-134025-before.sql` and
+  `…-134025-after.sql`.
+- Revert this move only:
+
+      head -c -1 ~/notes/sites/alverix-page11-elementor-before-20261001-1340.json | ssh wp-eu 'sudo /usr/local/lib/kenmore-ops/wp alverix post meta update 11 _elementor_data'
+      ssh wp-eu 'sudo /usr/local/lib/kenmore-ops/wp alverix elementor flush_css'
+
 ## Working notes (2026-10-01)
 - `sudo /usr/local/lib/kenmore-ops/wp alverix …` runs wp-cli as user `alverix`. Exports
   go to `/var/backups/kenmore-ops/alverix/`, which `claude` cannot list.
@@ -116,3 +130,5 @@ back to the first (stacked) version.
 - wp-eu has no `/srv/incoming`; incoming files live on the ops machine. Images were
   copied to `/tmp/alverix-import/` on wp-eu for `media import` and the folder removed.
 - GD and Imagick are both present, so imports get the usual resized renditions.
+- Don't use `?m=` as a cache-busting parameter when fetching or screenshotting: `m` is
+  WordPress's date-archive query var and returns the 404 template. Use e.g. `?shot=`.
