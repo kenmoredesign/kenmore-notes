@@ -82,6 +82,31 @@ revert commands above still apply and remove the whole section; the full-restore
 alternative for this change is the `20261001-124406-before.sql` export, which goes
 back to the first (stacked) version.
 
+## 2026-10-01 13:00: page title and mobile section
+
+- Page title (`post_title`) "Platform" → "Match-Trader Platform". Slug stays `platform`
+  (the mu-plugin injection keys on it). The hero H1 (Elementor heading `786610c`) was
+  changed to match. Browser title is now "Match-Trader Platform – Alverix".
+- The nav menu item (db_id 19) inherited the new title, so its label was set back to
+  "Platform" explicitly with `menu item update 19 --title=Platform`.
+- Section `c0ad78c` (was "Keep Your Terminal Light by Streaming Only the Symbols You
+  Trade", with a generic phone mock-up, attachment 601): heading now "Trade From Your
+  Phone on the Same Account", new paragraph about the iOS/Android app, image replaced
+  with attachment 696 `match-trader-phone.jpg` (`Simple background/MTR_Mobile_dark_13.jpg`
+  in the zip). The "See All Instruments" button is unchanged. Attachment 601 is kept.
+- Screenshots: `/srv/incoming/alverix/review/platform-hero-{1440,390}.png` and
+  `platform-mobile-section-{1440,390}.png`.
+- Exports: `/var/backups/kenmore-ops/alverix/20261001-130046-before.sql` and
+  `…-130046-after.sql`.
+- Revert this change only:
+
+      head -c -1 ~/notes/sites/alverix-page11-elementor-before-20261001-1300.json | ssh wp-eu 'sudo /usr/local/lib/kenmore-ops/wp alverix post meta update 11 _elementor_data'
+      ssh wp-eu "sudo /usr/local/lib/kenmore-ops/wp alverix post update 11 --post_title=Platform"
+      ssh wp-eu 'sudo /usr/local/lib/kenmore-ops/wp alverix elementor flush_css'
+      ssh wp-eu 'sudo /usr/local/lib/kenmore-ops/wp alverix post delete 696 --force'
+
+  `alverix-page11-elementor-after.json` is the current page data.
+
 ## Working notes (2026-10-01)
 - `sudo /usr/local/lib/kenmore-ops/wp alverix …` runs wp-cli as user `alverix`. Exports
   go to `/var/backups/kenmore-ops/alverix/`, which `claude` cannot list.
