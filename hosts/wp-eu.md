@@ -183,3 +183,40 @@ No separate notes checkout was found (a `find` for `CLAUDE.md`, `.claude` and `n
 - root-only php-fpm logs (`*.slow.log`, mode 600)
 - `update-cloudflare-ips.sh` and `commission.sh` exist but I did not open them (scripts may hold credentials)
 - Whether plugins and themes are active, and which databases actually exist (both need DB access)
+
+## 2026-10-02: fit check for the live chat migration
+
+Read-only, as `claude`. Target for seven PHP Live! 4.7.8 chats from `livechat-old`
+(see `livechat-old.md` and `livechat-migration.md`).
+
+| | Found | Fit |
+|---|---|---|
+| PHP | 8.5.4 only. No PPA configured; `php7.4-fpm` has no candidate in the Ubuntu 26.04 archive | **Blocker.** The app needs PHP 7.4 or lower |
+| Containers | no docker or podman | relevant only as the fallback for old PHP |
+| MySQL | 8.4.11. `mysql_native_password` is **OFF** (the 8.4 default). `sql_mode` is the strict default. `require_secure_transport` off. TLS 1.2/1.3 | Old PHP 7.2 can only log in with `mysql_native_password`; the app expects non-strict mode |
+| bind-address | 127.0.0.1, set in both `mysqld.cnf` and `tuning.cnf` (the later file wins). `mysqlx` also local | Needs the public address added, and a restart |
+| `max_connections` | 102 | enough for seven small chats |
+| nginx | 1.28.3. `sites-available` + `sites-enabled/*`, `conf.d/cloudflare.conf` (real IP), `snippets/wordpress.conf`. Default server: 404 on 80, `ssl_reject_handshake` on 443 | A Flex chat needs its own port-80 vhost with no redirect; a Full chat needs its own 443 vhost or the handshake is rejected |
+| `/srv` | exists, empty, root-owned | `/srv/livechat` has to be created by root |
+| Disk | 138 GB free of 150 GB | the seven chats are under 250 MB with their databases |
+| RAM | 7.7 GB, 4.4 GB available, **no swap**. InnoDB buffer pool 3 GB | seven `ondemand` pools add little |
+| Mail | no MTA, nothing on 25 | same as the old box; the app's SMTP add-on dials out itself |
+| Public address | 91.99.203.165 on `eth0`; Tailscale 100.110.146.18 | |
+| Reboot | still pending (kernel 7.0.0-28 running) | not needed for this work; do not combine |
+
+A TCP connect from `livechat-old` to 91.99.203.165:3306 is refused at once, which
+means the Hetzner firewall and ufw both let it through and only the bind address
+stops it. (If ufw rejects rather than drops, this reading is wrong; see below.)
+
+**Could not see without root**
+- `ufw status`: ufw is active, its rules are unreadable. Is 3306 from 172.105.248.251
+  allowed there as well as in the Hetzner firewall?
+- Anything inside MySQL: existing users and their plugins, whether the server
+  certificate files exist, the effective `sql_mode`.
+- Whether the ondrej/php PPA publishes PHP 7.4 for Ubuntu 26.04. Adding a PPA to
+  check is itself a root action.
+- `/etc/letsencrypt` (how certbot is set up to issue for a new name).
+- AppArmor's `usr.sbin.mysqld` profile is loaded; it does not restrict bind addresses,
+  but I could not read the effective policy.
+- `claude`'s only sudo is `/usr/local/lib/kenmore-ops/*`, which holds one script (`wp`).
+  Nothing in this migration can be done on wp-eu by `claude` as things stand.
