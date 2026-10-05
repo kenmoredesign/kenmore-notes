@@ -45,6 +45,21 @@ confirmed first). Waiting at Gate B.**
 - Old box untouched by the rehearsal: every chat vhost still `original`.
 
 
+**alve becomes a direct chat, 2026-10-05 13:54 UTC.** chat.alverix.net was changed to
+a DNS-only A record for 91.99.203.165 (seen at 1.1.1.1, 8.8.8.8 and the zone's
+nameserver; no AAAA). Between that change and 13:54, visitors on https met wp-eu's
+self-signed certificate. `wp-eu-livechat.sh write-vhost alve` rewrote the vhost in the
+direct layout (443 app; 80 serving `/.well-known/acme-challenge/` from
+`/var/www/letsencrypt` and redirecting the rest to https; previous file in
+`/root/livechat/vhost-backup/`), then `cert alve` issued Let's Encrypt (YE1, to
+2027-01-03; renewed by wp-eu's certbot). Verified from outside with full certificate
+validation: 200, http 301 to https, all three page checks pass. PHP error log empty;
+nginx log only `/.env*` scanner refusals. alve is `direct` in the wp-eu scripts and
+`check.sh`; `old-livechat.sh` keeps `full`, which describes its old-box vhost.
+alve's old-box forwarding vhost now gets no traffic. **Rollback for alve is now DNS
+first**: point chat.alverix.net back at the old box (proxied, Full) before
+`bin/rollback-old.sh alve` means anything.
+
 **Second batch and step 6, 2026-10-05 12:55 to 13:05 UTC.**
 - Real chat test on sto: department, operator, a full conversation and transcript
   work. Setup > Interface > Themes showed the error page: `is_file()` on
@@ -134,7 +149,7 @@ serve again from the local database, as it did at that chat's cutover.
 
 | Chat | Domain | Cloudflare | Database | Notes |
 |---|---|---|---|---|
-| alve | chat.alverix.net | Full | alve | |
+| alve | chat.alverix.net | Full until 2026-10-05, then not proxied | alve | direct chat on wp-eu since 2026-10-05 |
 | ngelpartners | chat.ngelpartners.com | Flex | ngelpartners | |
 | pcxfx | chat.pcxfx.com | Flex | primecodex | |
 | thaurusguru | chat.thaurusguru.com | Flex | thau | |
@@ -262,7 +277,7 @@ old access log going quiet confirm it.
 
 | Chat | Name | Now | Zone held at | Change | Who makes it | Deadline |
 |---|---|---|---|---|---|---|
-| alve | chat.alverix.net | Cloudflare proxy, Full | Cloudflare `marjory/noah` (Kenmore, presumed) | origin A record to 91.99.203.165; stay proxied, stay Full | Kenmore | none |
+| alve | chat.alverix.net | **done 2026-10-05**: A 91.99.203.165, DNS-only (no longer proxied), TTL 300 | Cloudflare `marjory/noah` (Kenmore, presumed) | none left; now a direct chat with its own Let's Encrypt certificate | Kenmore | none |
 | vin | chat.vinnexiacapital.com | Cloudflare proxy, Full | client's Cloudflare `lara/uriah` | origin A record to 91.99.203.165; stay proxied, stay Full | client | none |
 | ngelpartners | chat.ngelpartners.com | Cloudflare proxy, Flex | client's Cloudflare `harleigh/tosana` | origin A record to 91.99.203.165; stay proxied, stay Flex | client | none |
 | pcxfx | chat.pcxfx.com | Cloudflare proxy, Flex | client's Cloudflare `garrett/journey` | origin A record to 91.99.203.165; stay proxied, stay Flex | client | none |
