@@ -119,6 +119,7 @@ Ready before anything is cut over. Run from `~/ops/livechat` on the ops machine.
 | ...and DNS already points at wp-eu | first `ssh root@wp-eu /root/livechat/wp-eu-livechat.sh disable <chat>`, then the line above, then move DNS back | as above |
 | Take the chats off wp-eu | `bin/rollback-old.sh all`, then `ssh root@wp-eu 'bash -s' < bin/rollback-wp-eu.sh` | Nothing. It disables the `lc-*` vhosts and pools, removes the real-IP rule and undoes `sql_mode`. Keeps data, users, files and PHP 7.4. It refuses if any `lc-*` vhost served a request in the last 10 minutes (`--force` overrides). |
 | Remove everything from wp-eu | `ssh root@wp-eu 'bash -s -- --purge --yes' < bin/rollback-wp-eu.sh` | The chat databases (each is dumped to `/var/backups/kenmore-ops/livechat/<chat>/` first), users, `/srv/livechat`, certificates, PHP 7.4 and the sury repository. Ubuntu's `php-common` goes back. |
+| Turn the old box's certbot renewal back on | `ssh livechat-old sudo cp -p /root/livechat-migration/original/crontab /etc/crontab` | nothing |
 | Undo the old-box hygiene | `ssh livechat-old sudo /root/livechat-migration/bin/old-livechat.sh unhygiene` | nothing |
 
 `bin/rollback-old.sh status` shows each chat's state on the old box (original,
@@ -270,13 +271,21 @@ old access log going quiet confirm it.
 | nc | chat.niivesh.com | A 172.105.248.251, not proxied | client, at Namecheap (`registrar-servers.com`) | A record to 91.99.203.165 | client | **2026-11-21 11:35 UTC** |
 | westernfx | chat.westernfx.com | A 172.105.248.251, not proxied | Cloudflare `marjory/noah` (Kenmore, presumed) | A record to 91.99.203.165, keep DNS-only | Kenmore | **2026-12-10 11:58 UTC** |
 
+**Certbot renewal on the old box is off** (2026-10-05 13:10 UTC). Its `/etc/crontab`
+line `0 0,12 * * * root ... certbot renew -q --renew-hook "service nginx reload"` is
+commented out with a marker; the original file is in
+`/root/livechat-migration/original/crontab` (mode 600). `certbot-renew.timer` was
+already disabled, and no certbot process was running. Reason: the box is retiring,
+and certbot's nginx plugin would edit vhosts that now forward. Its last run (12:45
+that day) only retried the 48 dead domains; none of the migrated names was due, and
+the eight chat vhosts were untouched. Undo:
+`ssh livechat-old sudo cp -p /root/livechat-migration/original/crontab /etc/crontab`.
+So the three old-box certificates below will simply expire on their dates.
+
 Deadlines are when the old box's Let's Encrypt certificate for that name expires;
 after that, visitors going through the old box get a certificate error. wp-eu already
 serves its own Let's Encrypt certificate for all three (to 2027-01-03, renewed by
-wp-eu's certbot through the same forwarded ACME path until DNS moves). The old box's
-certbot starts trying to renew these three about 30 days before expiry (from about
-2026-10-21) with its nginx plugin, on vhosts that now forward; moving DNS before
-then avoids that question.
+wp-eu's certbot through the same forwarded ACME path until DNS moves). With renewal off, those dates are hard: move each name before its date.
 
 Flex and Full: the five Cloudflare chats keep their current mode. wp-eu serves Flex
 chats on plain 80 (no redirect) and Full chats on 443 with a self-signed certificate,
