@@ -41,6 +41,37 @@ confirmed first). Waiting at Gate B.**
 - Old box untouched by the rehearsal: every chat vhost still `original`.
 
 
+**Gate B approved with the code change; first cutover batch done 2026-10-05
+11:33 to 11:38 UTC. nc, vin, thaurusguru and sto are forwarded to wp-eu. alve,
+westernfx, ngelpartners and pcxfx are still served by the old box. Waiting for a
+real chat test on sto.**
+- PHP 7.3 vs 7.4 (checked from the packages, nothing installed): sury's 7.3
+  `mysqlnd` has the native, cleartext and sha256 auth plugins but no
+  `caching_sha2_password`; 7.4's has it, and the old box's 7.2 does not. So 7.3
+  would have needed `mysql_native_password` (startup-only in 8.4: a restart), unless
+  a deprecated `sha256_password` user had worked over the socket, which was not tried.
+- The `Util_Error.php` change is now three marked lines: deprecations ignored; the 7.4
+  notice "Trying to access array offset on value of type ..." logged with file and
+  line and the request continues; every error that still shows the error page is
+  logged with file and line first. Tested from the CLI on wp-eu. Error-page lines
+  carry an `America/New_York` timestamp because the app switches timezone first.
+  Rehearsal checks re-run after the change: all pass, a new footprint written in
+  each chat.
+- nc rollback proof: cut over, `bin/rollback-old.sh nc` put the original vhost back
+  and the old copy answered (no wp-eu header) from outside, then cut over again.
+- Found and fixed during the batch: (1) nginx on the old box can take seconds after
+  `reload` before outside connections see the new config, so the first nc attempt
+  saw stale states and rolled itself back; the tool now waits until each state is in
+  effect, and the cutover also waits for the 503 to show from outside before the final
+  dump. (2) That wait aborted on a curl timeout against sto's original vhost (its
+  dead database); it now treats a timeout as "not yet". (3) sto's database still had
+  two rehearsal footprints after cutover; it was reloaded from the dump at 11:38.
+- 503 per chat: about 5 seconds. Row counts identical (sto: equal to the dump). No
+  rehearsal rows left in any cut-over database.
+- Forwarded requests are logged on wp-eu with the visitor's address (tested through
+  the old box for nc and thaurusguru); none with the old box's.
+- `lc-*` PHP error logs read after each cutover: empty.
+
 Changes from the 2026-10-05 review: opcache off in every `lc-*` pool; needrestart
 list-only through the environment of that one apt run (no file changed); the
 rehearsal also proves one database write per chat; cutover order nc (with the
