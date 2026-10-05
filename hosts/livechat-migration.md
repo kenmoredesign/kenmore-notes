@@ -4,6 +4,10 @@ Revised 2026-10-05 for the decisions of that day (forwarding instead of a databa
 link). The 2026-10-02 Gate A plan is in git history. Facts behind it: `livechat-old.md`
 and the 2026-10-02 section of `wp-eu.md`. Scripts: `~/ops/livechat/`.
 
+**Status 2026-10-05 13:05 UTC: all eight chats are cut over.** livechat-old forwards
+each one to wp-eu over HTTPS; the chats run on wp-eu from wp-eu's MySQL. Remaining:
+the DNS changes below, then retiring the forwarding and the old box.
+
 **Status 2026-10-05:** Gate A approved. Step 2 done on the old box: backup in
 `/root/livechat-migration/20261005-105822Z/` (`original` points at it; checksums
 verified; 7 database dumps, 8 configs, 11 vhosts). The `josaimarkets`,
@@ -40,6 +44,31 @@ confirmed first). Waiting at Gate B.**
   databases, so the test rows go with them.
 - Old box untouched by the rehearsal: every chat vhost still `original`.
 
+
+**Second batch and step 6, 2026-10-05 12:55 to 13:05 UTC.**
+- Real chat test on sto: department, operator, a full conversation and transcript
+  work. Setup > Interface > Themes showed the error page: `is_file()` on
+  `../themes/._clouds/thumb.png` failed open_basedir, because `._clouds` is a macOS
+  AppleDouble file, not a directory. Both occurrences (Themes, and the operator
+  console `ops/index.php` line 415) were in sto's PHP error log with file and line.
+- 10,272 `._*` files removed from the wp-eu copies (2,568 each in alve, nc, sto, vin;
+  none in the 2018-tree chats). The list is `livechat-dotunder-files.txt`.
+  `chat.tar.gz` on the old box carries the same 2,568: phase 2 must strip them too.
+  `import-files` and `import-web` now strip them.
+- `Util_Error.php` change is now four marked lines; the fourth logs an "open_basedir
+  restriction in effect" warning with file and line and continues (the call returns
+  false, as on the old box, which had no open_basedir). open_basedir stays on.
+  Applied in place to all eight with `wp-eu-livechat.sh repatch`, which never touches
+  `web/`. All eight are marked live (`/root/livechat/live-<chat>`), so `import-files`
+  refuses them.
+- alve, westernfx, ngelpartners, pcxfx cut over at 13:00 to 13:01: 5 to 6 seconds
+  of 503 each, row counts identical, both paths pass.
+- Let's Encrypt on wp-eu for chat.niivesh.com, chat.2sto.net, chat.westernfx.com
+  (to 2027-01-03), through the old box's forwarded ACME path. No private key moved.
+- After-backups: `/var/backups/kenmore-ops/livechat/<chat>/20261005-1302*-after-cutover.sql.gz`.
+- Error logs after the last cutover: PHP, only sto's 3 earlier lines (2 error pages
+  from before the fix, 1 array-offset notice logged and continued). nginx: 41 lines,
+  all scanners asking for `/.env*`, refused by the dotfile rule.
 
 **Gate B approved with the code change; first cutover batch done 2026-10-05
 11:33 to 11:38 UTC. nc, vin, thaurusguru and sto are forwarded to wp-eu. alve,
@@ -225,12 +254,34 @@ and sto: `$WP cert <chat>`.
 
 ## DNS changes
 
-Filled in at step 6.
+Checked 2026-10-05. New origin for every chat: **91.99.203.165** (wp-eu). Until a
+record changes, livechat-old keeps forwarding that chat, so there is no hurry except
+where a deadline is given. After a change, `bin/check.sh <chat> new` and the chat's
+old access log going quiet confirm it.
+
+| Chat | Name | Now | Zone held at | Change | Who makes it | Deadline |
+|---|---|---|---|---|---|---|
+| alve | chat.alverix.net | Cloudflare proxy, Full | Cloudflare `marjory/noah` (Kenmore, presumed) | origin A record to 91.99.203.165; stay proxied, stay Full | Kenmore | none |
+| vin | chat.vinnexiacapital.com | Cloudflare proxy, Full | client's Cloudflare `lara/uriah` | origin A record to 91.99.203.165; stay proxied, stay Full | client | none |
+| ngelpartners | chat.ngelpartners.com | Cloudflare proxy, Flex | client's Cloudflare `harleigh/tosana` | origin A record to 91.99.203.165; stay proxied, stay Flex | client | none |
+| pcxfx | chat.pcxfx.com | Cloudflare proxy, Flex | client's Cloudflare `garrett/journey` | origin A record to 91.99.203.165; stay proxied, stay Flex | client | none |
+| thaurusguru | chat.thaurusguru.com | Cloudflare proxy, Flex | client's Cloudflare `kevin/tiffany` | origin A record to 91.99.203.165; stay proxied, stay Flex | client | none |
+| sto | chat.2sto.net | A 172.105.248.251, not proxied | Cloudflare `marjory/noah` (Kenmore, presumed) | A record to 91.99.203.165, keep DNS-only | Kenmore | **2026-11-20 23:36 UTC** |
+| nc | chat.niivesh.com | A 172.105.248.251, not proxied | client, at Namecheap (`registrar-servers.com`) | A record to 91.99.203.165 | client | **2026-11-21 11:35 UTC** |
+| westernfx | chat.westernfx.com | A 172.105.248.251, not proxied | Cloudflare `marjory/noah` (Kenmore, presumed) | A record to 91.99.203.165, keep DNS-only | Kenmore | **2026-12-10 11:58 UTC** |
+
+Deadlines are when the old box's Let's Encrypt certificate for that name expires;
+after that, visitors going through the old box get a certificate error. wp-eu already
+serves its own Let's Encrypt certificate for all three (to 2027-01-03, renewed by
+wp-eu's certbot through the same forwarded ACME path until DNS moves). The old box's
+certbot starts trying to renew these three about 30 days before expiry (from about
+2026-10-21) with its nginx plugin, on vhosts that now forward; moving DNS before
+then avoids that question.
+
+Flex and Full: the five Cloudflare chats keep their current mode. wp-eu serves Flex
+chats on plain 80 (no redirect) and Full chats on 443 with a self-signed certificate,
+and also answers every chat on both ports.
 
 ## Not part of this work
 
-- The old box's certbot will try to renew chat.niivesh.com from about 2026-10-22,
-  chat.2sto.net from 2026-10-21 and chat.westernfx.com from 2026-11-10, with the
-  nginx plugin, on vhosts that now forward. Moving those three names' DNS before then
-  avoids finding out what it does.
 - wp-eu has no scheduled backup; after cutover it holds the only live copy of the chats.
