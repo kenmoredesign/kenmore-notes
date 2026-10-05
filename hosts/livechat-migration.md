@@ -12,6 +12,35 @@ The six `config.php.bak.2026-09-18` files and `ngelpartners/web/config.php_old_s
 were moved to `original/config-bak/`. All seven working chats still pass `check.sh old`.
 Nothing changed on wp-eu yet.
 
+**Steps 3 and 4 done 2026-10-05 11:00 to 11:10 UTC (root window; Hetzner snapshot
+confirmed first). Waiting at Gate B.**
+- PHP 7.4.33 installed exactly as dry-run (10 `php7.4-*`, `php-common` 2:101).
+  `php -v` 8.5.4; php8.5-fpm not restarted (PID 1428555, up since 2026-10-03
+  06:51); both WordPress sites 200 before and after.
+- MySQL on wp-eu has no socket login for `root@localhost`. The wp-eu scripts use
+  the distro maintenance account (`--defaults-file=/etc/mysql/debian.cnf`, auth_socket
+  for root, full grants). `sql_mode` persisted; the old value is in
+  `/root/livechat/sql_mode.orig`.
+- PHP 7.4 logs in with `caching_sha2_password`; no MySQL restart was needed.
+- **App fix on the wp-eu copies:** PHP Live!'s error handler turns any notice into a
+  "Live Chat Temporarily Unavailable" page, and PHP 7.4 deprecates
+  `get_magic_quotes_gpc()`, which it calls on every request. `import-files` adds one
+  marked line to `API/Util_Error.php` so the handler ignores deprecation notices
+  (8192, 16384). The old box's copies are unchanged. Side effect: the app sets
+  `error_reporting(0)` and now swallows deprecations too, so empty PHP error logs
+  say little about deprecations.
+- All eight imported: code streamed from the old box, databases by
+  `--single-transaction` dump (sto from its file). Row counts match the old box for
+  the seven, and match the dump for sto.
+- Every chat passes widget, operator login and setup login on wp-eu, on 443 and,
+  for Flex and Full chats, also on 80. PHP 7.4 and nginx error logs are empty.
+- Write proof: one marked footprint (`onpage` `https://rehearsal.invalid/livechat-migration`)
+  sent to each chat's `/ajax/footprints.php` landed in `p_footprints` and
+  `p_footprints_u` in all eight databases. The cutover's final load replaces these
+  databases, so the test rows go with them.
+- Old box untouched by the rehearsal: every chat vhost still `original`.
+
+
 Changes from the 2026-10-05 review: opcache off in every `lc-*` pool; needrestart
 list-only through the environment of that one apt run (no file changed); the
 rehearsal also proves one database write per chat; cutover order nc (with the
