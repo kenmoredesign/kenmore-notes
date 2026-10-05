@@ -1,211 +1,167 @@
 # Live chat migration: livechat-old to wp-eu
 
-Gate A plan, written 2026-10-02. **Nothing here has been done.** Facts behind it are in
-`livechat-old.md` and the 2026-10-02 section of `wp-eu.md`.
+Revised 2026-10-05 for the decisions of that day (forwarding instead of a database
+link). The 2026-10-02 Gate A plan is in git history. Facts behind it: `livechat-old.md`
+and the 2026-10-02 section of `wp-eu.md`. Scripts: `~/ops/livechat/`.
 
-## What the inventory changes about the brief
-
-1. **Only seven chats have a database to move.** The other 87 installed chats point at
-   a database host (`ziemel.kenmoredesign.net` and two others) that stopped answering
-   around 2026-09-22. Six databases were moved onto livechat-old on 2026-09-18; a
-   seventh (`alve`) was installed there on 2026-09-22.
-2. **Two chats with real traffic are down right now**: `gofund` (chat.gofund.trade) and
-   `ffun` (chat.fundedfun.com). Their databases were not among the six.
-3. **wp-eu cannot run the app as it stands.** PHP Live! 4.7.8 needs PHP 7.4 or lower;
-   wp-eu has 8.5 only and Ubuntu 26.04 ships nothing older.
-4. **"Both copies run on one database" holds for the database only.** In-progress chat
-   state is files under `web/chat_sessions/`. A visitor on one copy and an operator on
-   the other would not see each other. For Cloudflare-proxied chats the origin switch
-   is all-at-once, so this never arises. For the two direct-DNS chats it could during
-   DNS propagation; neither has an operator account, so no chat can be in progress.
-
-## Decisions needed before anything starts
-
-| # | Question | Recommendation |
-|---|---|---|
-| 1 | What happened to `ziemel`, and do the other databases still exist anywhere? | Needed for `gofund` and `ffun`. Without their data the choice is a fresh empty install on wp-eu or retiring them |
-| 2 | How to get PHP 7.4 on wp-eu | The ondrej/php PPA, if it publishes 7.4 for Ubuntu 26.04 (root has to check). Fallback: a `php:7.4-fpm` container per host. Not recommended: patching the app for PHP 8 (about 45 files) |
-| 3 | TLS on the database link | Yes. It needs a three-line edit to `API/SQLi.php` in the seven old copies; without it visitor names, emails and chat text cross the internet in clear |
-| 4 | Move `nc` and `vin`? They work but nobody uses them | Move them; it costs nothing extra and avoids a second round |
-| 5 | `zen` (chat.zentrobrokerage.com, set up 2026-09-07) and `sto` (chat.2sto.net, 2026-06-23) are Kenmore's own recent chats and are in the broken group | If they are wanted, they are fresh installs, which is phase 2's `create-chat` |
-| 6 | Who runs the root steps on wp-eu | Scripts in `~/ops/livechat/bin/`, reviewed, installed by alex into `/usr/local/lib/kenmore-ops/` so `claude` runs them with sudo, as with `wp`. This overlaps phase 2 |
-
-## Per chat
-
-All seven "go" chats need old PHP. None needs ionCube.
-
-| Verdict | Chats |
-|---|---|
-| **Go, needs old PHP** | `alve`, `ngelpartners`, `pcxfx` (database `primecodex`), `thaurusguru` (database `thau`), `westernfx` |
-| **Go if wanted (decision 4)** | `nc`, `vin` |
-| **Blocked: alive, no database (decision 1)** | `gofund`, `ffun` |
-| **Dead unless their database turns up** (DNS still reaches the old box, no real traffic) | `aiwa`, `blackridgecm`, `blackwavecapital`, `dreammarketsfx`, `ef`, `excm`, `finprop`, `ft`, `fund`, `gene`, `ibullcapital`, `mainetfunded`, `mbfx`, `mi`, `monkeyforex`, `onebidasset`, `onfon`, `pat`, `propfirmcapital`, `proptradacademy`, `pst`, `quicktrade`, `sto`, `tf`, `uniborsa`, `vm`, `xfin`, `xfintr8`, `zen` |
-| **Dead** (name no longer resolves to the old box) | the 56 marked `dead` in `livechat-old.md` |
-| **Never installed** | `5rf`, `axisby`, `bldemochat`, `el`, `finestock`, `josaimarkets`, `ntc`, `perfectlions`, `praxisdigital`, `switzprime`, `thau`; `inzo` is a static page |
-
-## Layout on wp-eu
-
-Kept as close to `create-chat` and `create-db` as possible: the docroot is the chat
-directory itself, the database and its user carry the same name, and the nginx vhost
-is the old template with the paths changed. The Unix user and the pool are new,
-because wp-eu isolates every site and the old box did not.
-
-| | Old box | wp-eu |
-|---|---|---|
-| Directory and docroot | `/var/www/html/<name>/` | `/srv/livechat/<name>/` |
-| Code ownership | `root:root` | `root:root`, read-only to PHP |
-| Writable data | `web/`, 777, written by `apache` | `web/`, owner `lc-<name>`, group `www-data`, 2750 |
-| Unix user | shared `apache` | `lc-<name>`, no login, home `/srv/livechat/<name>` |
-| PHP-FPM pool | shared `www`, PHP 7.2 | `/etc/php/7.4/fpm/pool.d/lc-<name>.conf`, socket `/run/php/php7.4-fpm-lc-<name>.sock`, `ondemand`, 5 children, `open_basedir /srv/livechat/<name>:/tmp`, limits as on the old box (128M, 2M upload, 8M post) |
-| nginx vhost | `sites-available/<name>.conf` | `sites-available/lc-<name>`, sets `$chat_name`, includes one shared `snippets/livechat.conf` (the old `general.conf` and `php.conf` merged) |
-| Logs | `/var/log/nginx/<name>_access.log` | `/var/log/nginx/lc-<name>.access.log` |
-| Database | `<db>` | same name: `alve`, `ngelpartners`, `primecodex`, `thau`, `westernfx`, `nc`, `vin` |
-| Database user | `<db>@localhost` | `<db>@localhost` and `<db>@172.105.248.251` |
-| Backups | none | `/var/backups/kenmore-ops/livechat/<name>/` |
-
-In each copied `web/config.php` four path values change from `/var/www/html/<name>` to
-`/srv/livechat/<name>`. `SQLHOST` stays `localhost`. Nothing else changes.
-
-## The direct database link
-
-**On wp-eu (root), one new file `/etc/mysql/mysql.conf.d/zz-livechat.cnf`:**
-
-    [mysqld]
-    bind-address          = 127.0.0.1,91.99.203.165
-    mysql_native_password = ON
-    sql_mode              = NO_ENGINE_SUBSTITUTION
-
-- `bind-address`: `tuning.cnf` and `mysqld.cnf` both set it to 127.0.0.1; a `zz-` file
-  sorts last and wins. `mysqlx` stays local.
-- `mysql_native_password`: off by default in 8.4. PHP 7.2 on the old box can log in no
-  other way.
-- `sql_mode`: the old server was switched to non-strict for this app on 2026-09-18.
-  WordPress sets its own session mode on connect and already drops the strict modes,
-  so the two sites should see no difference.
-- These need a **MySQL restart**: the WordPress sites lose their database for the
-  length of it, estimated 10 to 30 seconds.
-- ufw: confirm `ufw status`, and add `allow from 172.105.248.251 to any port 3306
-  proto tcp` if it is not there.
-
-**Users**, two per chat, created from the old server's stored hash so no password is
-typed or shown:
-
-    CREATE USER '<db>'@'localhost'        IDENTIFIED WITH mysql_native_password AS '<hash>';
-    CREATE USER '<db>'@'172.105.248.251'  IDENTIFIED WITH mysql_native_password AS '<hash>' REQUIRE SSL;
-    GRANT ALL PRIVILEGES ON `<db>`.* TO both;
-
-Same password as today, so the copied `config.php` works unchanged on wp-eu and the
-old one needs only its host changed. `REQUIRE SSL` applies if decision 3 is yes.
-
-**TLS.** The old client can do it: mysqlnd with OpenSSL 1.1.1k, TLS 1.2 and 1.3, and
-MySQL 8.4 generates a server certificate by itself. But the app connects with
-`new mysqli(host, user, pass)`, which cannot ask for TLS. The edit in
-`API/SQLi.php` on the old copies replaces that line with `mysqli_init()` and
-`real_connect(..., MYSQLI_CLIENT_SSL | MYSQLI_CLIENT_SSL_DONT_VERIFY_SERVER_CERT)`.
-That encrypts without verifying the server; verifying would mean copying wp-eu's
-`ca.pem` to the old box and one more line.
-
-**On the old box:**
-- In each `web/config.php`, `SQLHOST` goes from `localhost` to `91.99.203.165`. The
-  IPv4 address, not a name: this box prefers IPv6 outbound and the grant and firewall
-  rule are for 172.105.248.251.
-- SELinux needs nothing: it is permissive, and `httpd_can_network_connect_db` is on.
-- firewalld does not filter outbound. No PHP restart is needed (no opcache).
-- The path is already open: 91.99.203.165:3306 refuses the connection today.
-
-## Cloudflare and TLS on the new origin
-
-| Chat | Mode | wp-eu vhost serves |
-|---|---|---|
-| `ngelpartners`, `pcxfx`, `thaurusguru` | Flex | **port 80 only, plain HTTP, no redirect.** The `cf.conf` template as it is |
-| `alve`, `vin` | Full | port 80 as above, plus 443 with a new 10-year self-signed certificate in `/etc/ssl/selfsigned/<domain>.{crt,key}`, generated on wp-eu. Cloudflare Full does not validate it, so the old key need not travel |
-| `westernfx`, `nc` | not proxied | 443 with a public certificate, 80 serving the ACME path and redirecting the rest |
-
-- wp-eu's default 443 server rejects the handshake, so a Full chat without its own 443
-  vhost would fail loudly instead of showing the wrong site. Good.
-- Nothing in the app or the vhost forces HTTPS on the Flex chats. `BASE_URL` is https
-  in every config and that already works behind Flex today.
-- `westernfx` and `nc` have a chicken-and-egg problem: certbot on wp-eu cannot pass
-  HTTP-01 until DNS points there. Copy the current Let's Encrypt pair from the old box
-  for the cutover (valid to 2026-12-10 and 2026-11-21), then issue properly on wp-eu
-  once DNS has moved. This is the one place a private key crosses hosts.
-- `conf.d/cloudflare.conf` on wp-eu already restores the visitor IP.
-
-## Cutover, in order
-
-**Stage 0: prepare wp-eu. No chat downtime. Root.**
-1. Install PHP 7.4 FPM (decision 2) with mysqli, curl, and the modules listed in
-   `livechat-old.md`. Confirm 8.5 and the WordPress pools are untouched.
-2. Create `/srv/livechat`, `snippets/livechat.conf`, and per chat: user, directory,
-   pool, vhost (not yet enabled), self-signed pair where Full.
-3. Write `zz-livechat.cnf`; check ufw.
-4. **Gate B.** Restart MySQL. WordPress outage 10 to 30 seconds. Check both sites.
-5. Create the seven databases and fourteen users.
-
-**Stage 1: rehearsal. No downtime.**
-6. Stream code and a `--single-transaction` dump per chat through the ops machine
-   (`ssh livechat-old … | ssh wp-eu …`), nothing landing on its disk. Load, fix the
-   four paths in `config.php`, enable the vhosts.
-7. Test each new copy with `curl --resolve <domain>:80:91.99.203.165` (and `:443`):
-   widget script, operator login page, setup login page. Read the PHP 7.4 error log.
-   This is where MySQL 8.4 or PHP 7.4 surprises show, before anything live is touched.
-8. From the old box, connect to wp-eu as one chat's user with TLS. Proves the link.
-
-**Stage 2: the database move. Gate B. Chats down for about 5 minutes; ask for 15.**
-9. Before-backup on the old box: dump of each database and a copy of each
-   `config.php` (and `API/SQLi.php`) to `/root/livechat-migration/<timestamp>/`, mode
-   600, outside any docroot.
-10. Stop `php-fpm` on the old box. All chats there return 502. Downtime starts.
-11. Final dump of the seven databases, load into wp-eu (replacing the rehearsal copy).
-    Final sync of each `web/` directory.
-12. Edit the seven old `config.php` files: `SQLHOST`. Apply the `SQLi.php` edit if TLS.
-13. Start `php-fpm`. Downtime ends. The old copies now run on wp-eu's database.
-14. Verify old and new copy of every chat; compare row counts per table on both sides.
-15. After-backup: dump each database on wp-eu to
-    `/var/backups/kenmore-ops/livechat/<name>/`. The old box's local databases are
-    left in place, untouched, as the rollback.
-
-**Stage 3: move the names. Per chat, no downtime, any time after stage 2.**
-16. Flex and Full chats: the origin A record in the zone's Cloudflare account changes
-    to 91.99.203.165. `alve` is Kenmore's; the other four are the clients' accounts.
-17. `westernfx` (Kenmore's zone) and `nc` (client, Namecheap): A record to
-    91.99.203.165, then issue the real certificate on wp-eu.
-18. When a chat's old access log has gone quiet for a few days, disable its old vhost.
-    When all seven have, remove the `@172.105.248.251` users and put
-    `bind-address` back to local only. The old box can then go. (`mysql_native_password`
-    stays on until the chats' own users are moved off it, which is phase 2.)
+**Status 2026-10-05: Gate A. Nothing has been changed on either host.**
 
 ## Rollback
 
-| If it fails at | Do this | Loses |
+Ready before anything is cut over. Run from `~/ops/livechat` on the ops machine.
+
+| Situation | Command | What it loses |
 |---|---|---|
-| Stage 0 step 4 (MySQL will not start, or WordPress misbehaves) | delete `zz-livechat.cnf`, restart MySQL | nothing |
-| Stage 1 | disable the `lc-*` vhosts, reload nginx | nothing; nothing live was touched |
-| Stage 2, before step 13 | restore the seven `config.php` (and `SQLi.php`) from step 9, start `php-fpm` | nothing; the local databases were never modified |
-| Stage 2, after step 13 | stop `php-fpm`; dump the seven databases from wp-eu and load them into the old local MySQL; restore `config.php` and `SQLi.php` from step 9; start `php-fpm`. The quick form skips the dump-back | quick form only: writes made since step 13 |
-| Stage 3 | put the A record back. Both copies share the database, so either origin is current | nothing |
+| One chat misbehaves after cutover | `bin/rollback-old.sh <chat>` | Everything that chat wrote on wp-eu since its cutover. Takes seconds. |
+| All chats | `bin/rollback-old.sh all` | Same, for every chat. `sto` goes back to its original, broken state (its database was on `ziemel`). |
+| A chat has had real use since cutover | `ssh root@wp-eu /root/livechat/wp-eu-livechat.sh dump <chat> \| bin/rollback-old.sh --from-dump <chat>` | Nothing written before the dump. The chat shows 503 for the minute it takes. Needs a root window on wp-eu. The local database is saved to `/root/livechat-migration/pre-rollback-<time>/` before it is replaced. Not for `sto` (no local database). |
+| ...and DNS already points at wp-eu | first `ssh root@wp-eu /root/livechat/wp-eu-livechat.sh disable <chat>`, then the line above, then move DNS back | as above |
+| Take the chats off wp-eu | `bin/rollback-old.sh all`, then `ssh root@wp-eu 'bash -s' < bin/rollback-wp-eu.sh` | Nothing. It disables the `lc-*` vhosts and pools, removes the real-IP rule and undoes `sql_mode`. Keeps data, users, files and PHP 7.4. It refuses if any `lc-*` vhost served a request in the last 10 minutes (`--force` overrides). |
+| Remove everything from wp-eu | `ssh root@wp-eu 'bash -s -- --purge --yes' < bin/rollback-wp-eu.sh` | The chat databases (each is dumped to `/var/backups/kenmore-ops/livechat/<chat>/` first), users, `/srv/livechat`, certificates, PHP 7.4 and the sury repository. Ubuntu's `php-common` goes back. |
+| Undo the old-box hygiene | `ssh livechat-old sudo /root/livechat-migration/bin/old-livechat.sh unhygiene` | nothing |
 
-## What needs root on wp-eu
+`bin/rollback-old.sh status` shows each chat's state on the old box (original,
+maint, forward). `bin/check.sh <chat> old|new|both` tests a chat on either box.
 
-Everything on wp-eu. `claude` can run only `/usr/local/lib/kenmore-ops/*` there.
+How the fast rollback works: the migration never modifies or drops the old box's
+local databases, and every changed vhost has its original in
+`/root/livechat-migration/original/vhosts/`. Restoring the vhost makes the old copy
+serve again from the local database, as it did at that chat's cutover.
 
-- installing PHP 7.4 and its FPM service (apt, possibly a PPA)
-- `/srv/livechat/*`, the `lc-*` users, `/var/backups/kenmore-ops/livechat`
-- pool files and reloading PHP-FPM 7.4
-- nginx snippet, vhosts, self-signed pairs, installing the two copied certificates,
-  reload; later certbot for `westernfx` and `nc`
-- `zz-livechat.cnf` and the MySQL restart
-- ufw rule
-- creating databases and users, loading dumps, taking the after-backups
+## What is moving
 
-On the old box `claude` has sudo and can do all of stage 2's steps there.
+| Chat | Domain | Cloudflare | Database | Notes |
+|---|---|---|---|---|
+| alve | chat.alverix.net | Full | alve | |
+| ngelpartners | chat.ngelpartners.com | Flex | ngelpartners | |
+| pcxfx | chat.pcxfx.com | Flex | primecodex | |
+| thaurusguru | chat.thaurusguru.com | Flex | thau | |
+| vin | chat.vinnexiacapital.com | Full | vin | |
+| westernfx | chat.westernfx.com | not proxied | westernfx | public certificate on wp-eu |
+| nc | chat.niivesh.com | not proxied | nc | public certificate on wp-eu; cut over first (no users) |
+| sto | chat.2sto.net | not proxied | sto | database from `/srv/incoming/livechat/sto.sql.gz`; code from the old box |
 
-## Not part of this plan, but should not be forgotten
+`gofund`, `ffun` and `zen` are dead and stay where they are.
 
-- The open `/setup/install.php` on `josaimarkets`, `praxisdigital` and `thau`, which
-  scanners are already hitting. Disabling three vhosts on the old box would close it.
-- The six `config.php.bak.2026-09-18` files inside docroots on the old box.
-- No MTA on either host. Only `primecodex` has SMTP configured in the app; whether its
-  provider accepts wp-eu's address, and on which port, is unknown.
-- wp-eu has no scheduled backup. After stage 2 it holds the only current copy of the
-  chat data.
+**The sto dump** (`sto.sql.gz`, 4.6 KB, 36 KB unpacked) is a complete `mysqldump`
+from MySQL 5.6.39 on 2026-09-17 13:23 ("Dump completed" trailer present). It holds
+the 35 standard PHP Live! tables. Only `p_admins`, `p_vars`, `p_footprints`,
+`p_footprints_u`, `p_footstats`, `p_ips` and `p_refer` have rows. So setup ran (an
+admin account exists) but no departments or operators were ever added, the same
+shape as `alve` and `westernfx`. Whether it loads is tested in the rehearsal.
+
+## How it works
+
+- **No database link.** MySQL on wp-eu stays on localhost. At cutover, the chat's
+  vhost on the old box stops serving PHP and forwards every request to wp-eu over
+  HTTPS (`proxy_pass https://91.99.203.165`, SNI and `Host` set to the chat's
+  domain). It sends the visitor's address in `CF-Connecting-IP`; wp-eu trusts that
+  header from 172.105.248.251 (`conf.d/livechat-realip.conf`), next to the existing
+  Cloudflare ranges.
+- So there is only one live copy per chat at any time, and the file-based chat
+  state in `web/chat_sessions/` is never split between two servers.
+- For the three direct-DNS chats the old box also forwards
+  `/.well-known/acme-challenge/` over plain HTTP, so certbot on wp-eu can get their
+  certificates before DNS moves. No private key moves between hosts.
+- When a chat's DNS moves, visitors reach wp-eu directly and the old box's
+  forwarding vhost simply goes quiet.
+
+## PHP 7.4
+
+Checked 2026-10-05 from the ops machine, no root: `packages.sury.org/php` has a
+`resolute` suite (amd64, main, signed by `15058500A0235D97F5D10063B188E2B695BD4743`,
+the DEB.SURY.ORG key) with `php7.4-*` 7.4.33. It also has php8.5 8.5.11, newer than
+wp-eu's Ubuntu 8.5.4, so the pin matters.
+
+Pin (`/etc/apt/preferences.d/sury-php`): everything from sury at -1 (never), except
+`php7.4 php7.4-*` and `php-common` at 500. `php-common` has to come along because
+Ubuntu's `2:99ubuntu1` declares `Breaks: php7.4-common`.
+
+Dry run (simulated on the ops machine against a copy of wp-eu's
+`/var/lib/dpkg/status`, Ubuntu lists plus sury, with the pin):
+
+    The following NEW packages will be installed:
+      php7.4-bz2 php7.4-cli php7.4-common php7.4-curl php7.4-fpm php7.4-json
+      php7.4-mysql php7.4-opcache php7.4-readline php7.4-sqlite3
+    The following packages will be upgraded:
+      php-common     (2:99ubuntu1 -> 2:101~+0~20260503.72+ubuntu26.04~1, sury)
+    1 upgraded, 10 newly installed, 0 to remove
+
+PHP 8.5 candidates stay Ubuntu's 8.5.4-0ubuntu1.3. `php-common`'s postinst restarts
+only `phpsessionclean.timer`. php8.5-fpm's only dpkg trigger watches
+`/etc/php/8.5/fpm/conf.d`, which the 7.4 packages do not touch. wp-eu runs
+`needrestart`, so the install sets `NEEDRESTART_MODE=l` (list, never restart).
+`php7.4-cli` registers `/usr/bin/php` at priority 74, below 8.5's 85, so `php` stays
+8.5. `unattended-upgrades` only takes Ubuntu origins, so nothing from sury arrives
+by itself.
+
+`wp-eu-php74.sh install` repeats the dry run on wp-eu and refuses unless it
+installs only `php7.4-*`, upgrades at most `php-common`, removes nothing and leaves
+php8.5 alone. Afterwards it prints `php -v`, php8.5-fpm's PID and start time before
+and after, and both WordPress sites' status codes.
+
+## Layout on wp-eu
+
+| | |
+|---|---|
+| Code and docroot | `/srv/livechat/<name>/`, `root:root`, read-only to PHP |
+| Writable data | `web/`, owner `lc-<name>`, group `www-data`, dirs 2750, files 640 |
+| Unix user | `lc-<name>`, system, no login |
+| Pool | `/etc/php/7.4/fpm/pool.d/lc-<name>.conf`, socket `/run/php/php7.4-fpm-lc-<name>.sock`, ondemand, 5 children, `open_basedir /srv/livechat/<name>:/tmp`, 128M, 2M upload, 8M post, UTC |
+| vhost | `/etc/nginx/sites-available/lc-<name>`, shared `snippets/livechat.conf`, logs `/var/log/nginx/lc-<name>.*.log` |
+| TLS | every chat answers on 443 with a 10-year self-signed certificate in `/etc/ssl/livechat/`. Flex and Full chats also serve the app on plain 80 with no redirect. Direct chats use 80 for ACME and a redirect, and switch to Let's Encrypt via `wp-eu-livechat.sh cert` |
+| Database | same name as on the old box, `utf8mb4_general_ci` default |
+| Database user | the chat's own `SQLLOGIN@localhost`, created with the password already in its `config.php`, read by PHP 7.4 (which applies the app's `stripslashes()`), never printed. Default plugin (`caching_sha2_password`) |
+| `sql_mode` | `SET PERSIST sql_mode = 'NO_ENGINE_SUBSTITUTION'`, no restart. The old value is saved in `/root/livechat/sql_mode.orig`. WordPress sets its own session mode, so the two sites are unaffected |
+| Backups | `/var/backups/kenmore-ops/livechat/<name>/` |
+| Root-only tool | `/root/livechat/wp-eu-livechat.sh` |
+
+The snippet adds `X-Livechat-Origin: wp-eu` to responses (that is how `check.sh`
+tells the two servers apart), and denies dotfiles, `*.bak`/`*.sql` and direct
+requests for `web/config.php`.
+
+If PHP 7.4 turns out unable to log in with `caching_sha2_password`, the plan stops:
+the alternative needs `mysql_native_password=ON`, which means a MySQL restart.
+`import-files` tests the login right after creating the user.
+
+## Order
+
+| Step | What | Who | Gate |
+|---|---|---|---|
+| 1 | PHP 7.4 check, sto dump, this file, the scripts | done | **A (now)** |
+| 2 | Old box: `backup`, then `hygiene` (disable the `josaimarkets`, `praxisdigital`, `thau` vhosts; move the six `config.php.bak.2026-09-18` into the backup) | claude, sudo on old box | after A |
+| 3 | wp-eu: `wp-eu-php74.sh check`, show the dry run, `install`, `wp-eu-build.sh`, copy `wp-eu-livechat.sh` to `/root/livechat/` | root window; Hetzner snapshot confirmed first | |
+| 4 | Rehearsal: per chat `export-files \| import-files`, `export-db \| import-db` (sto: `zcat sto.sql.gz \| import-db sto`), `check.sh <chat> new`, `wp-eu-livechat.sh errors` | root window | **B** |
+| 5 | Cutover, one chat at a time, nc first (then roll nc back and cut it over again) | claude + root window | your go |
+| 6 | After-backups, certificates for westernfx, nc, sto, DNS table below, notes, commit and push | root window | |
+
+**Cutover of one chat** (about a minute of 503). Each line is a separate command.
+
+    OLD="ssh livechat-old sudo /root/livechat-migration/bin/old-livechat.sh"
+    WP="ssh root@wp-eu /root/livechat/wp-eu-livechat.sh"
+    $OLD maint <chat>                                    # 503 starts
+    $OLD export-db <chat>  | $WP import-db <chat>        # not for sto
+    $OLD export-web <chat> | $WP import-web <chat>
+    diff <($OLD counts <chat>) <($WP counts <chat>)      # must be empty (sto: compare to the dump)
+    bin/check.sh <chat> new
+    $OLD forward <chat>                                  # 503 ends
+    bin/check.sh <chat> both
+    # any failure after 'maint':  bin/rollback-old.sh <chat>
+
+After all chats: `$WP backup <chat> after-cutover` for each. For westernfx, nc
+and sto: `$WP cert <chat>`.
+
+## DNS changes
+
+Filled in at step 6.
+
+## Not part of this work
+
+- `ngelpartners/web/config.php_old_server`: a seventh stray credential file in a
+  docroot, found 2026-10-05. Not in the hygiene list; the exports skip it. Moving it
+  with the others is a one-line addition, pending a yes.
+- The old box's certbot will try to renew chat.niivesh.com from about 2026-10-22,
+  chat.2sto.net from 2026-10-21 and chat.westernfx.com from 2026-11-10, with the
+  nginx plugin, on vhosts that now forward. Moving those three names' DNS before then
+  avoids finding out what it does.
+- wp-eu has no scheduled backup; after cutover it holds the only live copy of the chats.
