@@ -4,7 +4,19 @@ Revised 2026-10-05 for the decisions of that day (forwarding instead of a databa
 link). The 2026-10-02 Gate A plan is in git history. Facts behind it: `livechat-old.md`
 and the 2026-10-02 section of `wp-eu.md`. Scripts: `~/ops/livechat/`.
 
-**Status 2026-10-05: Gate A. Nothing has been changed on either host.**
+**Status 2026-10-05:** Gate A approved. Step 2 done on the old box: backup in
+`/root/livechat-migration/20261005-105822Z/` (`original` points at it; checksums
+verified; 7 database dumps, 8 configs, 11 vhosts). The `josaimarkets`,
+`praxisdigital` and `thau` vhosts are disabled (their `/setup/install.php` now 404s).
+The six `config.php.bak.2026-09-18` files and `ngelpartners/web/config.php_old_server`
+were moved to `original/config-bak/`. All seven working chats still pass `check.sh old`.
+Nothing changed on wp-eu yet.
+
+Changes from the 2026-10-05 review: opcache off in every `lc-*` pool; needrestart
+list-only through the environment of that one apt run (no file changed); the
+rehearsal also proves one database write per chat; cutover order nc (with the
+rollback proof), vin, thaurusguru, then a stop and report, then sto, alve,
+westernfx, ngelpartners, pcxfx.
 
 ## Rollback
 
@@ -157,9 +169,6 @@ Filled in at step 6.
 
 ## Not part of this work
 
-- `ngelpartners/web/config.php_old_server`: a seventh stray credential file in a
-  docroot, found 2026-10-05. Not in the hygiene list; the exports skip it. Moving it
-  with the others is a one-line addition, pending a yes.
 - The old box's certbot will try to renew chat.niivesh.com from about 2026-10-22,
   chat.2sto.net from 2026-10-21 and chat.westernfx.com from 2026-11-10, with the
   nginx plugin, on vhosts that now forward. Moving those three names' DNS before then
