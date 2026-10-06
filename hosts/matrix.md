@@ -17,7 +17,7 @@ Commissioned 2026-10-06 with `commission/commission.sh matrix` (ops commit `535f
 ## Open issues found 2026-10-06 (read-only survey, nothing changed)
 
 1. **Fixed 2026-10-06: nightly Postgres backup.** The old job ran as `claude` through `docker compose exec` and would have failed from 03:30 UTC on 2026-10-07, because commissioning removed `claude` from the `docker` group. It now runs as root from a root-owned script (see "Backups").
-2. **Cleared by itself: `openai-gw` was unhealthy on 2026-10-06 from about 13:00 to the 16:18 UTC reset** because the ChatGPT Plus usage limit was exhausted, not because of auth. Healthy again by the 18:03 heartbeat. It will recur while the hub shares that account. Details under "OpenAI gateway".
+2. **Cleared by itself: `openai-gw` was unhealthy on 2026-10-06 from about 13:00 to the 16:18 UTC reset** because the ChatGPT Plus usage limit was exhausted, not because of auth. Healthy again by the 18:03 heartbeat. The gateway moved off that account the same evening (Codex LB), so this cause no longer applies to it. Details under "OpenAI gateway".
 3. **`claude` owns the whole of `/opt/support-hub`**, including `.env` and `secrets/` (mode 600/700, owner `claude`). The ops login therefore can read every secret and edit code and compose without sudo. The three locally built services also run as uid 1000 inside their containers, which is why the files are owned that way (they rewrite their token files).
 
 ## /opt/support-hub
@@ -25,7 +25,7 @@ Commissioned 2026-10-06 with `commission/commission.sh matrix` (ops commit `535f
 Docker Compose project `support-hub` (`docker-compose.yml`, one file). Host: 2 vCPU, 3.8G RAM, 75G disk at 29%. Tree is `claude:claude` unless noted.
 
 ### Git
-Git repo, branch `master`, author `support-hub-ops`. **Since 2026-10-06 it has a remote:** `origin` = `git@github-support-hub:kenmoredesign/support-hub.git`, a private repo under Alex's personal GitHub account `kenmoredesign` (a user account, not an organisation). First push 2026-10-06: 97 commits, 70 files, head `9a8602e`.
+Git repo, branch `master`, author `support-hub-ops`. **Since 2026-10-06 it has a remote:** `origin` = `git@github-support-hub:kenmoredesign/support-hub.git`, a private repo under Alex's personal GitHub account `kenmoredesign` (a user account, not an organisation). First push 2026-10-06: 97 commits, 70 files. Head after the Codex LB switch: `33c9270`.
 
 - Deploy key `~claude/.ssh/gh-support-hub` on matrix (title `matrix` on GitHub, write access), ssh alias `github-support-hub` in `~claude/.ssh/config`, GitHub host keys pinned in `known_hosts`. `claude` pushes without sudo.
 - `.gitignore` excludes `.env*`, `secrets/`, `backups/`, every data directory, `.claude/`, `*.bak*`, `*.orig`, `*.dump`, `*.sql.gz`, `*.key`, `*.pem`, `**/auth.json*`, `**/registration.yaml`, `analysis/`.
@@ -111,20 +111,31 @@ Services: caddy, synapse, element, postgres, relay, openai-gw, status, mautrix-w
 - Nothing auto-restarts on unhealthy, and a restart would not help.
 - **Recovered:** heartbeats at 18:03 and 20:03 UTC were OK and the container is healthy again.
 
-### Planned, not started (decided 2026-10-06)
-Order: the GitHub copy of the Support Hub came first (done 2026-10-06, see "Git"); next, switch the gateway to Codex LB at `http://100.85.194.92:2455/backend-api/codex/responses` with an API key in `secrets/openai-gw/codex-lb.key`, keeping the ChatGPT login as rollback. No model changes: Alex is adding `gpt-5.6-terra` to the key (it already allows `gpt-5.6-sol` and `gpt-5.6-luna`). The `!status` prompt and schema are not to be touched. The gateway container reaching the LB is confirmed (401 without a key).
+### Switched to Codex LB 2026-10-06 21:40 UTC
+The gateway no longer uses the ChatGPT login. Support Hub commits `022cf35` (code) and `33c9270` (compose), pushed to GitHub.
+
+- **Upstream:** `http://100.85.194.92:2455/backend-api/codex/responses` (Codex LB on the tailnet, plain HTTP inside WireGuard), same wire format as before.
+- **Auth:** API key, one line in `/opt/support-hub/secrets/openai-gw/codex-lb.key` (`claude:claude` 600, placed by Alex). Re-read on every call, so replacing the key needs no restart. The key allows `gpt-5.6-sol`, `gpt-5.6-terra` and `gpt-5.6-luna`.
+- **Switch:** `GW_UPSTREAM_URL` and `GW_API_KEY_PATH` on the `openai-gw` service in `docker-compose.yml`. Both or neither; the gateway refuses to start with only one.
+- **No model, prompt or schema changes.** `/translate` and `/image` stay on `gpt-5.6-terra`, `/topmodel` on `gpt-5.6-sol`.
+- **Key-mode behaviour:** no token refresh, no `chatgpt-account-id` header, no device-login code in alerts (alerts explain the LB and key file instead). A missing, empty or rejected key is an auth failure: alert, unhealthy container, relay on DeepSeek.
+- **Cutover:** only `openai-gw` was rebuilt and recreated (`docker compose build openai-gw`, `up -d --no-deps openai-gw`, as root); all other container ids unchanged. Healthy 15 seconds after start.
+- **Tests through the LB, all passed:** translation via `/translate` (200, 2.7s, `gpt-5.6-terra`), `/topmodel` trivial prompt (200, 2.1s, `gpt-5.6-sol`), `/topmodel` with a trivial `json_schema` (200, strict JSON returned), `/health` 200, relay `/healthz` shows `active_provider: openai`. Not tested: `/image`, a real `!status` run, very large inputs.
+- **Rollback:** the previous image is tagged `support-hub-openai-gw:pre-codex-lb-20261006` (`b8f6571d0a82`). Either delete the two compose lines and `docker compose up -d --no-deps openai-gw` (new code, ChatGPT login), or additionally `docker tag support-hub-openai-gw:pre-codex-lb-20261006 support-hub-openai-gw:latest` first to go back to the old code too. `secrets/openai-gw/auth.json` was left in place for this; its access token expires 2026-10-09 and nothing refreshes it now, so a rollback after that date depends on the refresh token still being accepted, or on `python -m gw.setup_auth`.
+- **Docs not yet updated:** `RUNBOOK.md` "OpenAI gateway" and `HANDOFF.md` still describe the ChatGPT login as the gateway's auth.
 
 ## How the stack authenticates to OpenAI
 
-Not an API key: ChatGPT OAuth sessions in Codex `auth.json` format (`auth_mode: chatgpt`, `OPENAI_API_KEY: null`), client id of the Codex CLI, refreshed against `auth.openai.com`.
+Since 2026-10-06 the gateway uses a Codex LB API key (see above). The older logins are ChatGPT OAuth sessions in Codex `auth.json` format (`auth_mode: chatgpt`, `OPENAI_API_KEY: null`), client id of the Codex CLI, refreshed against `auth.openai.com`.
 
 | File | Used by | State |
 |---|---|---|
-| `/opt/support-hub/secrets/openai-gw/auth.json` | `openai-gw` (`GW_AUTH_JSON_PATH=/secrets/auth.json`). **This is the live login** for translations, `!status` and images | refreshed 2026-09-29, access token valid to 2026-10-09 |
+| `/opt/support-hub/secrets/openai-gw/codex-lb.key` | `openai-gw`. **This is the live credential since 2026-10-06** (Codex LB API key) for translations, `!status` and images | placed 2026-10-06 |
+| `/opt/support-hub/secrets/openai-gw/auth.json` | Nothing while the gateway is in key mode; kept as the rollback login | last refreshed 2026-09-29, access token valid to 2026-10-09, no longer refreshed |
 | `/opt/support-hub/secrets/relay/openai-auth.json` | `relay`, only if `RELAY_OPENAI_URL` is removed from compose (the documented rollback switch) | separate session, refreshed 2026-09-29 |
 | `/home/claude/.codex/auth.json` | **Nothing.** Not mounted into any container, not referenced by compose, code or scripts | written 2026-06-12, never refreshed, access token expired 2026-06-22, last read 2026-09-15 |
 
-All three are sessions on the **same ChatGPT Plus account** with three different refresh tokens. `HANDOFF.md` §9 still describes the old re-auth route (`codex login` on the host, copy `~/.codex/auth.json` into `secrets/relay/`), and warns not to run `codex` on the host. That route was superseded on 2026-07-21 by the gateway's device-code flow (outage alerts in Support Control carry a login code; manual form is `docker compose run --rm --no-deps openai-gw python -m gw.setup_auth`). Two `codex` binaries remain on the host (`/home/claude/.local/bin/codex`, `/usr/local/bin/codex`). Whether the stale refresh token in `~/.codex` still works was not tested, since testing would rotate it.
+The three `auth.json` files are sessions on the **same ChatGPT Plus account** with three different refresh tokens. `HANDOFF.md` §9 still describes the old re-auth route (`codex login` on the host, copy `~/.codex/auth.json` into `secrets/relay/`), and warns not to run `codex` on the host. That route was superseded on 2026-07-21 by the gateway's device-code flow (outage alerts in Support Control carry a login code; manual form is `docker compose run --rm --no-deps openai-gw python -m gw.setup_auth`). Two `codex` binaries remain on the host (`/home/claude/.local/bin/codex`, `/usr/local/bin/codex`). Whether the stale refresh token in `~/.codex` still works was not tested, since testing would rotate it.
 
 ## Old Claude Code context on the host
 
