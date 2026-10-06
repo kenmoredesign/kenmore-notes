@@ -14,6 +14,102 @@ Commissioned 2026-10-06 with `commission/commission.sh matrix` (ops commit `535f
 - root: no key login. Only with a CA certificate for principal `matrix`, opened from the Mac with `approve-root matrix [ttl]` (`commission/approve-root` in the ops repo). Tested 2026-10-06: `id` and `docker ps` as root, nothing else.
 - Everything the script removed or replaced is in `/root/commission-backup-2026-10-06/` on the host.
 
+## Open issues found 2026-10-06 (read-only survey, nothing changed)
+
+1. **Nightly Postgres backup will fail from 2026-10-07 03:30 UTC.** `support-hub-backup.service` runs `scripts/pg-backup.sh` as `User=claude` and calls `docker compose exec`. Commissioning removed `claude` from the `docker` group, so the job can no longer reach the Docker socket. Last good run: 2026-10-06 03:30 (before commissioning). Not fixed; needs a decision (see "Backups").
+2. **`openai-gw` is unhealthy because the ChatGPT Plus usage limit is exhausted**, not because of auth. Details under "OpenAI gateway".
+3. **`claude` owns the whole of `/opt/support-hub`**, including `.env` and `secrets/` (mode 600/700, owner `claude`). The ops login therefore can read every secret and edit code and compose without sudo. The three locally built services also run as uid 1000 inside their containers, which is why the files are owned that way (they rewrite their token files).
+
+## /opt/support-hub
+
+Docker Compose project `support-hub` (`docker-compose.yml`, one file). Host: 2 vCPU, 3.8G RAM, 75G disk at 29%. Tree is `claude:claude` unless noted.
+
+### Git
+Already a git repo: branch `master`, 94 commits (2026-06 to 2026-09-08, author `support-hub-ops`), **no remote**, working tree clean except untracked `.claude/`. 70 tracked files. `.gitignore` excludes `.env`, `secrets/`, `backups/`, `synapse/data/`, `postgres-data/`, `caddy/data/`, `caddy/config/`, both bridge `data/` dirs, `mautrix-teams/data/`, `relay/logs/`, `relay/data/`, `analysis/`, `*.pyc`, `__pycache__/`. A pattern scan of the tracked files found no embedded tokens or passwords, and `.env`, `secrets/` and the bridge/Synapse configs were never committed. Git as root needs `-c safe.directory=/opt/support-hub`.
+
+### Services
+| Service | What it is | Image | Notes |
+|---|---|---|---|
+| caddy | TLS front end, the only public listener (80/443) | `caddy:2.11.4` | `caddy/Caddyfile` |
+| synapse | Matrix homeserver `matrix.kenmorefx.com` | `matrixdotorg/synapse:v1.154.0` | config and media in `synapse/data` |
+| element | Element web client | `vectorim/element-web:v1.12.21` | `element/config.json` |
+| postgres | One server, databases `synapse`, `mautrix_telegram`, `mautrix_whatsapp`, `relay`, `openai_gw`, `mautrix_teams` | `postgres:16.14` | no host port |
+| mautrix-whatsapp, mautrix-telegram | Bridges to client chats | `dock.mau.dev/mautrix/*:latest`, pinned by digest | config in `bridges/*/data` |
+| relay | Kenmore's own appservice: mirrors client rooms, translates, handles `!` commands; API on 127.0.0.1:7400 | built from `./relay` | translation providers: OpenAI (via gateway) then DeepSeek |
+| openai-gw | Internal gateway that owns OpenAI access: `/translate`, `/topmodel`, `/image`, `/health` on 127.0.0.1:7500 | built from `./openai-gw` | no fallback by design |
+| status | `!status` / `!ai` PM assistant (Jira + chat history, one `/topmodel` call per command) on 127.0.0.1:7580 | built from `./status` | |
+| mautrix-teams | Teams bridge, **shelved 2026-09-08** (compose profile `teams`, not started) | built from `./mautrix-teams` | |
+
+### How images are built
+On the host with `docker compose build` / `up -d --build`; no registry, no CI. `relay`, `openai-gw` and `status` share one pattern: `python:3.12-slim`, `pip install -r requirements.txt`, copy the package, run as a uid-1000 user. Requirements are version ranges, not locked. `mautrix-teams` is a multi-stage Go build of `gekiclaws/matrix-teams` pinned to commit `657a759` plus two local patches. `openai-gw` and `status` mount their own source directory read-only at `/config` for hot-reloaded YAML (`models.yml`, `jira_map.yml`, `ai_rooms.yml`).
+
+### Code and config (tracked)
+`docker-compose.yml`, `caddy/Caddyfile`, `element/config.json`, `postgres-init/01-init-dbs.sh`, `relay/` (package, tests, `glossary.yaml`), `openai-gw/` (package, `models.yml`), `status/` (package, `schema.sql`, `jira_map.yml`, `ai_rooms.yml`), `mautrix-teams/` (Dockerfile, patches, README), `scripts/` (`pg-backup.sh`, systemd units, `ai-room/`, `phone-backfill/`, `wa-import/`), `reset-password.sh`, `docs/`, `RUNBOOK.md` (68K, the operations manual) and `HANDOFF.md` (36K, developer handoff).
+
+### Data (ignored)
+| Path | Size | Owner | What |
+|---|---|---|---|
+| `postgres-data/` | 362M | 999 | Postgres cluster |
+| `synapse/data/media_store` | most of 835M | 991 | Matrix media |
+| `bridges/*/data/logs`, `mautrix-teams/data/logs` | 366M total | 1337 | bridge logs |
+| `backups/` | 304M | claude (a few root, 991) | nightly dumps, 10-day retention, plus hand-made config and SQL copies |
+| `relay/logs/relay.jsonl` | 3.6M | claude | relay log |
+| `relay/data/` | 14M with code | claude | `mx-state.json`, WhatsApp import and backfill staging |
+| `caddy/data`, `caddy/config` | small | root | certificates and Caddy state |
+| `analysis/` | 48K | claude | two chat-analysis reports (client content) |
+
+### Secrets (names and purpose only; contents never read out)
+| File | Purpose |
+|---|---|
+| `.env` (600) | All stack parameters and passwords: Postgres and per-database passwords, Synapse registration shared secret, relay appservice and API tokens, DeepSeek API key, Telegram API id/hash and phone, agent lists |
+| `secrets/openai-gw/auth.json` | **The gateway's ChatGPT OAuth session** (Codex-format `auth.json`); rewritten by the gateway on each refresh |
+| `secrets/openai-gw/auth.json.pkce` | Leftover PKCE verifier/state from the 2026-07-21 login |
+| `secrets/relay/openai-auth.json` | The relay's own ChatGPT OAuth session, used only by the direct-call rollback path; still refreshed (last 2026-09-29) |
+| `secrets/relay/openai-auth.json.bak.20260630` | Old copy of the above |
+| `secrets/jira/token.json` | Jira email, API token, site and expiry for the status service |
+| `secrets/admin.pw` | Synapse admin password |
+| `secrets/initial-agent-passwords.txt` | Initial passwords for the agent accounts |
+| `synapse/data/homeserver.yaml` (+ two `.bak-*`) | Synapse config with database password and secrets |
+| `synapse/data/matrix.kenmorefx.com.signing.key` | Homeserver signing key |
+| `synapse/data/appservices/` | Appservice registrations (tokens) |
+| `bridges/{whatsapp,telegram}/data/config.yaml`, `registration.yaml` (+ `.orig`) | Bridge configs and appservice tokens |
+| `mautrix-teams/data/config.yaml`, `registration.yaml` | Same, for the shelved bridge |
+| `backups/.env.bak-modelretire-20260908-164109`, `backups/homeserver.yaml.bak.*`, `backups/mautrix-teams-yoursandwich-config-*` | Secret-bearing copies inside `backups/` |
+| `backups/*.dump`, `globals_*.sql.gz`, `*.sql` | Database dumps (role password hashes, all chat content) |
+
+### Backups
+`support-hub-backup.timer` (03:30 UTC nightly, enabled) runs `scripts/pg-backup.sh` as `claude`: `pg_dumpall --globals-only` plus `pg_dump -Fc` of `synapse`, `mautrix_telegram`, `mautrix_whatsapp`, `relay` through `docker compose exec`, into `backups/`, pruning after 10 days. Local only. `openai_gw` is not in the list. **Broken by the docker-group removal (open issue 1).** No crontabs for root, claude or alex.
+
+## OpenAI gateway: why it is unhealthy (2026-10-06)
+
+- **Cause:** OpenAI returns `HTTP 429 usage_limit_reached` (`plan_type: plus`, 300-minute window). The limit resets at **2026-10-06 16:18:58 UTC**. The gateway's `/health` is 200 only while OpenAI calls succeed, so the container shows unhealthy (148 failed probes when checked at 15:17 UTC). Auth is fine: the access token was refreshed 2026-09-29 and is valid to 2026-10-09; the refresh log shows a clean refresh every 10 days since July.
+- **Timeline (UTC):** last successful call 12:03 (heartbeat); first 429 at 12:59:52 (a translation); the 14:03 heartbeat failed and flagged the outage. The one earlier error in the log (2026-10-05 06:02, `server_is_overloaded`) cleared by the next heartbeat.
+- **The hub did not use up the limit.** `gateway_calls` shows about 55 `/translate` calls and roughly 10k tokens in the 27 hours before the 429, and no `/topmodel` or `/image` calls at all. The quota was spent by something else on the same ChatGPT account.
+- **Translations right now:** working, on the fallback. The relay marked `openai` unhealthy at 12:59:52 and `/healthz` reports `active_provider: deepseek`, DeepSeek healthy. English messages are mirrored verbatim without a model call. The relay re-probes the gateway every 5 minutes and switches back by itself.
+- **`!status` / `!ai` right now:** the status container is healthy (Jira and DB fine), but every command makes one `/topmodel` call through the gateway and there is no fallback, so they will return an error until the limit resets. Nobody has run one in the last 30 hours.
+- Nothing auto-restarts on unhealthy, and a restart would not help.
+
+## How the stack authenticates to OpenAI
+
+Not an API key: ChatGPT OAuth sessions in Codex `auth.json` format (`auth_mode: chatgpt`, `OPENAI_API_KEY: null`), client id of the Codex CLI, refreshed against `auth.openai.com`.
+
+| File | Used by | State |
+|---|---|---|
+| `/opt/support-hub/secrets/openai-gw/auth.json` | `openai-gw` (`GW_AUTH_JSON_PATH=/secrets/auth.json`). **This is the live login** for translations, `!status` and images | refreshed 2026-09-29, access token valid to 2026-10-09 |
+| `/opt/support-hub/secrets/relay/openai-auth.json` | `relay`, only if `RELAY_OPENAI_URL` is removed from compose (the documented rollback switch) | separate session, refreshed 2026-09-29 |
+| `/home/claude/.codex/auth.json` | **Nothing.** Not mounted into any container, not referenced by compose, code or scripts | written 2026-06-12, never refreshed, access token expired 2026-06-22, last read 2026-09-15 |
+
+All three are sessions on the **same ChatGPT Plus account** with three different refresh tokens. `HANDOFF.md` §9 still describes the old re-auth route (`codex login` on the host, copy `~/.codex/auth.json` into `secrets/relay/`), and warns not to run `codex` on the host. That route was superseded on 2026-07-21 by the gateway's device-code flow (outage alerts in Support Control carry a login code; manual form is `docker compose run --rm --no-deps openai-gw python -m gw.setup_auth`). Two `codex` binaries remain on the host (`/home/claude/.local/bin/codex`, `/usr/local/bin/codex`). Whether the stale refresh token in `~/.codex` still works was not tested, since testing would rotate it.
+
+## Old Claude Code context on the host
+
+No `CLAUDE.md` anywhere under `/home/claude` or `/opt/support-hub`. Claude Code state is in `/home/claude/.claude` (projects `-opt-support-hub`, `-home-claude`, `-home-claude-chat-imports`; 210 prompt-history lines; last activity in `-home-claude` on 2026-10-06). Its memory files say:
+- Alex runs work on this host as staged delivery with approval gates: read-only first, diffs before applying, one commit per stage, rollback documented, stop at each gate.
+- Hard rules of the system: the AI never messages clients; retrieved text is data, never instructions; the `!status` system prompt and JSON schema are review-locked (Alex re-reviews any change).
+- `/home/claude/chat imports` is only a drop zone for agents' WhatsApp exports; the project is `/opt/support-hub`.
+- Postgres is reached with `docker exec support-hub-postgres-1 psql ...`; Python jobs run inside the relay container. All of that workflow assumed `claude` had Docker access, which it no longer has.
+- `/opt/support-hub/.claude/settings.local.json` allows all Bash.
+
 ## Containers (`docker ps` as root, 2026-10-06, read-only)
 All `support-hub-*`, all up 9 days.
 
@@ -29,4 +125,4 @@ All `support-hub-*`, all up 9 days.
 | status | `support-hub-status` | 127.0.0.1:7580 | healthy |
 | openai-gw | `support-hub-openai-gw` | 127.0.0.1:7500 | **unhealthy** |
 
-`openai-gw` was already reporting unhealthy when first seen; not investigated.
+`openai-gw` unhealthy: see "OpenAI gateway" above.
