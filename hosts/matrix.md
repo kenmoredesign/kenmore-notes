@@ -25,7 +25,13 @@ Commissioned 2026-10-06 with `commission/commission.sh matrix` (ops commit `535f
 Docker Compose project `support-hub` (`docker-compose.yml`, one file). Host: 2 vCPU, 3.8G RAM, 75G disk at 29%. Tree is `claude:claude` unless noted.
 
 ### Git
-Already a git repo: branch `master`, 94 commits (2026-06 to 2026-09-08, author `support-hub-ops`), **no remote**, working tree clean except untracked `.claude/`. 70 tracked files. `.gitignore` excludes `.env`, `secrets/`, `backups/`, `synapse/data/`, `postgres-data/`, `caddy/data/`, `caddy/config/`, both bridge `data/` dirs, `mautrix-teams/data/`, `relay/logs/`, `relay/data/`, `analysis/`, `*.pyc`, `__pycache__/`. A pattern scan of the tracked files found no embedded tokens or passwords, and `.env`, `secrets/` and the bridge/Synapse configs were never committed. Git as root needs `-c safe.directory=/opt/support-hub`.
+Git repo, branch `master`, author `support-hub-ops`. **Since 2026-10-06 it has a remote:** `origin` = `git@github-support-hub:kenmoredesign/support-hub.git`, a private repo under Alex's personal GitHub account `kenmoredesign` (a user account, not an organisation). First push 2026-10-06: 97 commits, 70 files, head `9a8602e`.
+
+- Deploy key `~claude/.ssh/gh-support-hub` on matrix (title `matrix` on GitHub, write access), ssh alias `github-support-hub` in `~claude/.ssh/config`, GitHub host keys pinned in `known_hosts`. `claude` pushes without sudo.
+- `.gitignore` excludes `.env*`, `secrets/`, `backups/`, every data directory, `.claude/`, `*.bak*`, `*.orig`, `*.dump`, `*.sql.gz`, `*.key`, `*.pem`, `**/auth.json*`, `**/registration.yaml`, `analysis/`.
+- Full-history scan before the push (all 96 commits and 267 file versions, including unreachable ones): no credential by exact match against 38 live secret values, no token-format or high-entropy matches, no secret file ever committed. Known and accepted: the shared business phone number (`TELEGRAM_PHONE`) is in a comment in `scripts/wa-import/wa_import.py`. Synapse and bridge config values could not be exact-matched (unreadable to `claude`).
+- The docs in the repo carry agent names, room IDs, the domain and Jira mappings.
+- Git as root needs `-c safe.directory=/opt/support-hub`.
 
 ### Services
 | Service | What it is | Image | Notes |
@@ -86,7 +92,7 @@ Changed 2026-10-06 (ops repo `matrix/`). `support-hub-backup.timer` (03:30 UTC n
 - The script reads nothing under `/opt/support-hub` (no compose file, no `.env`); it calls `docker exec support-hub-postgres-1` directly.
 - First run 2026-10-06 20:58 UTC through the unit: success, all four dumps validated (173, 25, 41 and 10 tables).
 - **`/opt/support-hub/backups/` is no longer written or pruned.** Its 68 files (nightly dumps to 2026-10-06 03:30 plus hand-made copies) stay until someone deletes them.
-- **`RUNBOOK.md` "Backups (Postgres)" is out of date**: it still describes `scripts/pg-backup.sh`, the old directory and restores as `claude`. The old script and unit copies remain in the Support Hub repo, unused.
+- `RUNBOOK.md` "Backups (Postgres)" and `HANDOFF.md` were brought up to date on 2026-10-06 (restore commands rewritten for root and container names, not yet re-run in that form). The old script and unit copies remain in the Support Hub repo, unused.
 - `claude` can start a backup with `sudo /usr/local/lib/kenmore-ops/support-hub-backup` (the sudo grant covers the directory).
 - Undo: remove the drop-in directory, `systemctl daemon-reload`, remove the script. That returns to the old job, which fails without the `docker` group.
 
@@ -106,7 +112,7 @@ Services: caddy, synapse, element, postgres, relay, openai-gw, status, mautrix-w
 - **Recovered:** heartbeats at 18:03 and 20:03 UTC were OK and the container is healthy again.
 
 ### Planned, not started (decided 2026-10-06)
-Order: first the GitHub copy of the Support Hub (`kenmoredesign/support-hub`, private, deploy key on matrix), then switch the gateway to Codex LB at `http://100.85.194.92:2455/backend-api/codex/responses` with an API key in `secrets/openai-gw/codex-lb.key`, keeping the ChatGPT login as rollback. No model changes: Alex is adding `gpt-5.6-terra` to the key (it already allows `gpt-5.6-sol` and `gpt-5.6-luna`). The `!status` prompt and schema are not to be touched. The gateway container reaching the LB is confirmed (401 without a key).
+Order: the GitHub copy of the Support Hub came first (done 2026-10-06, see "Git"); next, switch the gateway to Codex LB at `http://100.85.194.92:2455/backend-api/codex/responses` with an API key in `secrets/openai-gw/codex-lb.key`, keeping the ChatGPT login as rollback. No model changes: Alex is adding `gpt-5.6-terra` to the key (it already allows `gpt-5.6-sol` and `gpt-5.6-luna`). The `!status` prompt and schema are not to be touched. The gateway container reaching the LB is confirmed (401 without a key).
 
 ## How the stack authenticates to OpenAI
 
