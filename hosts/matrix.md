@@ -16,8 +16,8 @@ Commissioned 2026-10-06 with `commission/commission.sh matrix` (ops commit `535f
 
 ## Open issues found 2026-10-06 (read-only survey, nothing changed)
 
-1. **Nightly Postgres backup will fail from 2026-10-07 03:30 UTC.** `support-hub-backup.service` runs `scripts/pg-backup.sh` as `User=claude` and calls `docker compose exec`. Commissioning removed `claude` from the `docker` group, so the job can no longer reach the Docker socket. Last good run: 2026-10-06 03:30 (before commissioning). Not fixed; needs a decision (see "Backups").
-2. **`openai-gw` is unhealthy because the ChatGPT Plus usage limit is exhausted**, not because of auth. Details under "OpenAI gateway".
+1. **Fixed 2026-10-06: nightly Postgres backup.** The old job ran as `claude` through `docker compose exec` and would have failed from 03:30 UTC on 2026-10-07, because commissioning removed `claude` from the `docker` group. It now runs as root from a root-owned script (see "Backups").
+2. **Cleared by itself: `openai-gw` was unhealthy on 2026-10-06 from about 13:00 to the 16:18 UTC reset** because the ChatGPT Plus usage limit was exhausted, not because of auth. Healthy again by the 18:03 heartbeat. It will recur while the hub shares that account. Details under "OpenAI gateway".
 3. **`claude` owns the whole of `/opt/support-hub`**, including `.env` and `secrets/` (mode 600/700, owner `claude`). The ops login therefore can read every secret and edit code and compose without sudo. The three locally built services also run as uid 1000 inside their containers, which is why the files are owned that way (they rewrite their token files).
 
 ## /opt/support-hub
@@ -78,7 +78,22 @@ On the host with `docker compose build` / `up -d --build`; no registry, no CI. `
 | `backups/*.dump`, `globals_*.sql.gz`, `*.sql` | Database dumps (role password hashes, all chat content) |
 
 ### Backups
-`support-hub-backup.timer` (03:30 UTC nightly, enabled) runs `scripts/pg-backup.sh` as `claude`: `pg_dumpall --globals-only` plus `pg_dump -Fc` of `synapse`, `mautrix_telegram`, `mautrix_whatsapp`, `relay` through `docker compose exec`, into `backups/`, pruning after 10 days. Local only. `openai_gw` is not in the list. **Broken by the docker-group removal (open issue 1).** No crontabs for root, claude or alex.
+Changed 2026-10-06 (ops repo `matrix/`). `support-hub-backup.timer` (03:30 UTC nightly, unchanged) now runs `/usr/local/lib/kenmore-ops/support-hub-backup` **as root**, through the drop-in `/etc/systemd/system/support-hub-backup.service.d/kenmore.conf`.
+
+- **Dumps go to `/var/backups/support-hub/`** (`root:root` 700, files 600). `claude` cannot list or read it, so **restores need root**.
+- Same content as before: `pg_dumpall --globals-only` plus `pg_dump -Fc` of `synapse`, `mautrix_telegram`, `mautrix_whatsapp`, `relay`. `openai_gw` is deliberately not included. 10-day retention, applied only to the new directory. Local only, no off-host copy.
+- New: a dump is kept only if `pg_restore --list` reads it back; globals only if `gzip -t` passes.
+- The script reads nothing under `/opt/support-hub` (no compose file, no `.env`); it calls `docker exec support-hub-postgres-1` directly.
+- First run 2026-10-06 20:58 UTC through the unit: success, all four dumps validated (173, 25, 41 and 10 tables).
+- **`/opt/support-hub/backups/` is no longer written or pruned.** Its 68 files (nightly dumps to 2026-10-06 03:30 plus hand-made copies) stay until someone deletes them.
+- **`RUNBOOK.md` "Backups (Postgres)" is out of date**: it still describes `scripts/pg-backup.sh`, the old directory and restores as `claude`. The old script and unit copies remain in the Support Hub repo, unused.
+- `claude` can start a backup with `sudo /usr/local/lib/kenmore-ops/support-hub-backup` (the sudo grant covers the directory).
+- Undo: remove the drop-in directory, `systemctl daemon-reload`, remove the script. That returns to the old job, which fails without the `docker` group.
+
+### Ops helper
+`/usr/local/lib/kenmore-ops/hub` (root-owned, installed 2026-10-06), run by `claude` with sudo:
+`sudo /usr/local/lib/kenmore-ops/hub status`, `... logs <service> [lines]` (default 100, max 1000), `... restart <service>`.
+Services: caddy, synapse, element, postgres, relay, openai-gw, status, mautrix-whatsapp, mautrix-telegram. Restart of postgres is refused. It acts on containers by name and never reads the compose file. Restarts are logged to syslog (`kenmore-ops`). `restart` has not been exercised on a real service.
 
 ## OpenAI gateway: why it is unhealthy (2026-10-06)
 
@@ -88,6 +103,10 @@ On the host with `docker compose build` / `up -d --build`; no registry, no CI. `
 - **Translations right now:** working, on the fallback. The relay marked `openai` unhealthy at 12:59:52 and `/healthz` reports `active_provider: deepseek`, DeepSeek healthy. English messages are mirrored verbatim without a model call. The relay re-probes the gateway every 5 minutes and switches back by itself.
 - **`!status` / `!ai` right now:** the status container is healthy (Jira and DB fine), but every command makes one `/topmodel` call through the gateway and there is no fallback, so they will return an error until the limit resets. Nobody has run one in the last 30 hours.
 - Nothing auto-restarts on unhealthy, and a restart would not help.
+- **Recovered:** heartbeats at 18:03 and 20:03 UTC were OK and the container is healthy again.
+
+### Planned, not started (decided 2026-10-06)
+Order: first the GitHub copy of the Support Hub (`kenmoredesign/support-hub`, private, deploy key on matrix), then switch the gateway to Codex LB at `http://100.85.194.92:2455/backend-api/codex/responses` with an API key in `secrets/openai-gw/codex-lb.key`, keeping the ChatGPT login as rollback. No model changes: Alex is adding `gpt-5.6-terra` to the key (it already allows `gpt-5.6-sol` and `gpt-5.6-luna`). The `!status` prompt and schema are not to be touched. The gateway container reaching the LB is confirmed (401 without a key).
 
 ## How the stack authenticates to OpenAI
 
