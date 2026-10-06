@@ -25,7 +25,7 @@ Commissioned 2026-10-06 with `commission/commission.sh matrix` (ops commit `535f
 Docker Compose project `support-hub` (`docker-compose.yml`, one file). Host: 2 vCPU, 3.8G RAM, 75G disk at 29%. Tree is `claude:claude` unless noted.
 
 ### Git
-Git repo, branch `master`, author `support-hub-ops`. **Since 2026-10-06 it has a remote:** `origin` = `git@github-support-hub:kenmoredesign/support-hub.git`, a private repo under Alex's personal GitHub account `kenmoredesign` (a user account, not an organisation). First push 2026-10-06: 97 commits, 70 files. Head after the Codex LB switch and docs: `80a51e8`.
+Git repo, branch `master`, author `support-hub-ops`. **Since 2026-10-06 it has a remote:** `origin` = `git@github-support-hub:kenmoredesign/support-hub.git`, a private repo under Alex's personal GitHub account `kenmoredesign` (a user account, not an organisation). First push 2026-10-06: 97 commits, 70 files. Head after the Codex LB switch and docs: `fc21e64`.
 
 - Deploy key `~claude/.ssh/gh-support-hub` on matrix (title `matrix` on GitHub, write access), ssh alias `github-support-hub` in `~claude/.ssh/config`, GitHub host keys pinned in `known_hosts`. `claude` pushes without sudo.
 - `.gitignore` excludes `.env*`, `secrets/`, `backups/`, every data directory, `.claude/`, `*.bak*`, `*.orig`, `*.dump`, `*.sql.gz`, `*.key`, `*.pem`, `**/auth.json*`, `**/registration.yaml`, `analysis/`.
