@@ -25,7 +25,7 @@ Commissioned 2026-10-06 with `commission/commission.sh matrix` (ops commit `535f
 Docker Compose project `support-hub` (`docker-compose.yml`, one file). Host: 2 vCPU, 3.8G RAM, 75G disk at 29%. Tree is `claude:claude` unless noted.
 
 ### Git
-Git repo, branch `master`, author `support-hub-ops`. **Since 2026-10-06 it has a remote:** `origin` = `git@github-support-hub:kenmoredesign/support-hub.git`, a private repo under Alex's personal GitHub account `kenmoredesign` (a user account, not an organisation). First push 2026-10-06: 97 commits, 70 files. Head after the Codex LB switch: `33c9270`.
+Git repo, branch `master`, author `support-hub-ops`. **Since 2026-10-06 it has a remote:** `origin` = `git@github-support-hub:kenmoredesign/support-hub.git`, a private repo under Alex's personal GitHub account `kenmoredesign` (a user account, not an organisation). First push 2026-10-06: 97 commits, 70 files. Head after the Codex LB switch and docs: `80a51e8`.
 
 - Deploy key `~claude/.ssh/gh-support-hub` on matrix (title `matrix` on GitHub, write access), ssh alias `github-support-hub` in `~claude/.ssh/config`, GitHub host keys pinned in `known_hosts`. `claude` pushes without sudo.
 - `.gitignore` excludes `.env*`, `secrets/`, `backups/`, every data directory, `.claude/`, `*.bak*`, `*.orig`, `*.dump`, `*.sql.gz`, `*.key`, `*.pem`, `**/auth.json*`, `**/registration.yaml`, `analysis/`.
@@ -120,9 +120,9 @@ The gateway no longer uses the ChatGPT login. Support Hub commits `022cf35` (cod
 - **No model, prompt or schema changes.** `/translate` and `/image` stay on `gpt-5.6-terra`, `/topmodel` on `gpt-5.6-sol`.
 - **Key-mode behaviour:** no token refresh, no `chatgpt-account-id` header, no device-login code in alerts (alerts explain the LB and key file instead). A missing, empty or rejected key is an auth failure: alert, unhealthy container, relay on DeepSeek.
 - **Cutover:** only `openai-gw` was rebuilt and recreated (`docker compose build openai-gw`, `up -d --no-deps openai-gw`, as root); all other container ids unchanged. Healthy 15 seconds after start.
-- **Tests through the LB, all passed:** translation via `/translate` (200, 2.7s, `gpt-5.6-terra`), `/topmodel` trivial prompt (200, 2.1s, `gpt-5.6-sol`), `/topmodel` with a trivial `json_schema` (200, strict JSON returned), `/health` 200, relay `/healthz` shows `active_provider: openai`. Not tested: `/image`, a real `!status` run, very large inputs.
+- **Tests through the LB, all passed:** translation via `/translate` (200, 2.7s, `gpt-5.6-terra`), `/topmodel` trivial prompt (200, 2.1s, `gpt-5.6-sol`), `/topmodel` with a trivial `json_schema` (200, strict JSON returned), `/health` 200, relay `/healthz` shows `active_provider: openai`. `/image` tested separately the same evening: one image in 26s, valid PNG, generator `gpt-image-2-codex`. Not tested: a real `!status` run, very large inputs.
 - **Rollback:** the previous image is tagged `support-hub-openai-gw:pre-codex-lb-20261006` (`b8f6571d0a82`). Either delete the two compose lines and `docker compose up -d --no-deps openai-gw` (new code, ChatGPT login), or additionally `docker tag support-hub-openai-gw:pre-codex-lb-20261006 support-hub-openai-gw:latest` first to go back to the old code too. `secrets/openai-gw/auth.json` was left in place for this; its access token expires 2026-10-09 and nothing refreshes it now, so a rollback after that date depends on the refresh token still being accepted, or on `python -m gw.setup_auth`.
-- **Docs not yet updated:** `RUNBOOK.md` "OpenAI gateway" and `HANDOFF.md` still describe the ChatGPT login as the gateway's auth.
+- `RUNBOOK.md` "OpenAI gateway" and `HANDOFF.md` describe key mode, key replacement and the rollback since Support Hub commit `80a51e8`.
 
 ## How the stack authenticates to OpenAI
 
