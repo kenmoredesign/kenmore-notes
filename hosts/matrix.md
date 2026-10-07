@@ -25,7 +25,7 @@ Commissioned 2026-10-06 with `commission/commission.sh matrix` (ops commit `535f
 Docker Compose project `support-hub` (`docker-compose.yml`, one file). Host: 2 vCPU, 3.8G RAM, 75G disk at 29%. Tree is `claude:claude` unless noted.
 
 ### Git
-Git repo, branch `master`, author `support-hub-ops`. **Since 2026-10-06 it has a remote:** `origin` = `git@github-support-hub:kenmoredesign/support-hub.git`, a private repo under Alex's personal GitHub account `kenmoredesign` (a user account, not an organisation). First push 2026-10-06: 97 commits, 70 files. Head after the Codex LB switch, docs and the `!status` fix: `3749b62`.
+Git repo, branch `master`, author `support-hub-ops`. **Since 2026-10-06 it has a remote:** `origin` = `git@github-support-hub:kenmoredesign/support-hub.git`, a private repo under Alex's personal GitHub account `kenmoredesign` (a user account, not an organisation). First push 2026-10-06: 97 commits, 70 files. Head on GitHub after the upload-limit RUNBOOK entry: `ebb59b3`.
 
 - Deploy key `~claude/.ssh/gh-support-hub` on matrix (title `matrix` on GitHub, write access), ssh alias `github-support-hub` in `~claude/.ssh/config`, GitHub host keys pinned in `known_hosts`. `claude` pushes without sudo.
 - `.gitignore` excludes `.env*`, `secrets/`, `backups/`, every data directory, `.claude/`, `*.bak*`, `*.orig`, `*.dump`, `*.sql.gz`, `*.key`, `*.pem`, `**/auth.json*`, `**/registration.yaml`, `analysis/`.
@@ -132,13 +132,17 @@ The gateway no longer uses the ChatGPT login. Support Hub commits `022cf35` (cod
 - **Confirmed:** Alex ran `!status WFBL` at 21:59 UTC and the briefing arrived (623 new messages, 8 facts written, `gpt-5.6-sol` through the LB, 60s). This was also the first real `!status` through the Codex LB.
 - The two failed runs wrote no state, bookmark or facts.
 
-## WhatsApp media over 50 MiB is not bridged (found 2026-10-07, fix pending)
+## WhatsApp media over 50 MiB was not bridged (found and fixed 2026-10-07)
 
 - **Cause:** `max_upload_size` is not set in `synapse/data/homeserver.yaml`, so Synapse's 50 MiB default applies. mautrix-whatsapp refuses larger media before uploading (`media too large (63.20 MB > 52.43 MB)`) and posts an `m.notice` in the client-side room: "Failed to bridge video attachment, please view it on the WhatsApp app". The relay drops every bridge notice (`relay/relay/service.py`, `_inbound`), so the agents' room shows nothing.
 - **Frequency:** six cases in the bridge logs since 2026-06-29: 2026-07-14 video 79.48 MB, 2026-09-09 file 58.56 MB, and the same 63.20 MB video four times on 2026-10-06 and 2026-10-07 (twice in a direct chat, twice in the `[INZO]` group, relay conversation 24). Synapse rejected no uploads and Caddy returned no 413s; Caddy has no body limit and the bridge talks to Synapse directly.
-- **Decided 2026-10-07, NOT yet applied:** `max_upload_size: 100M`, then restart `synapse`, then `mautrix-whatsapp` and `mautrix-telegram`. The edit needs root (file is owned by uid 991, mode 600, not in git). The root window had closed before it could be done.
+- **Applied 2026-10-07 21:57 UTC:** `max_upload_size: 100M` (plus a one-line comment) appended to `synapse/data/homeserver.yaml`. Synapse restarted (healthy in about 7s), then `mautrix-whatsapp` and `mautrix-telegram` (both `CONNECTED` within seconds). Verified: the media config endpoint returns `{"m.upload.size":104857600}`; all nine containers healthy; no warnings or errors in the Synapse or bridge logs after the restart; relay, gateway and status healthy. Not yet proven with a real file over 50 MB.
+- **Undo:** `cp -p synapse/data/homeserver.yaml.bak-uploadsize-20261007-215739 synapse/data/homeserver.yaml` as root (the backup is the file before the change, same owner 991 and mode 600), then `docker restart support-hub-synapse-1`, wait for healthy, and restart both bridge containers.
+- The setting is recorded in the Support Hub `RUNBOOK.md` ("Synapse settings that live only on the host", commit `ebb59b3`), because `homeserver.yaml` is not in git.
+- The limit applies to Element users and the Telegram bridge too. No media retention is configured; `media_store` was 838M with 52G free on 2026-10-07.
 - **Missed videos cannot be re-fetched:** the bridge stored the message as the failure notice with no media details. After the limit is raised the video has to be sent or forwarded again in WhatsApp.
-- **Proposed, not built:** a relay change that turns the bridge's failed-media notice into a short marker in the agents' room only.
+- **Relay marker, built but NOT deployed (waiting for Alex's go):** Support Hub commit `4243f11`, local on matrix, not pushed. The bridge's failed-media notice from a client ghost becomes an `m.notice` in the agents' room only ("⚠️ Sent a video that could not be bridged. View it in WhatsApp.") and a stored transcript row `[video, not bridged]`. All other bridge notices stay dropped. WhatsApp wording only: the Telegram bridge logs (from 2026-06-22) contain no failed-media notice to copy. Matcher in `relay/relay/bridge_notice.py`, unit test `relay/tests/test_bridge_notice.py` (no dependencies). Deploying means rebuilding and recreating `relay` only.
+- **Relay restarts and missed messages:** the relay is a Matrix appservice, so Synapse pushes events to it and retries undelivered transactions when it is back. The relay claims each event id in the `processed_event` table before handling it (`claim_event`), so redelivery after a restart cannot double-mirror. Limitation: an event claimed but not yet mirrored when the process is stopped is not retried.
 - Bridge logs are in `bridges/whatsapp/data/logs/` (JSON, 100M rotation, back to 2026-06-29). Their debug lines contain display names, phone numbers and short-lived WhatsApp media tokens; filter to `error`/`warn` when reading them.
 
 ## How the stack authenticates to OpenAI
