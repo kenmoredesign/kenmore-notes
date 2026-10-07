@@ -25,7 +25,7 @@ Commissioned 2026-10-06 with `commission/commission.sh matrix` (ops commit `535f
 Docker Compose project `support-hub` (`docker-compose.yml`, one file). Host: 2 vCPU, 3.8G RAM, 75G disk at 29%. Tree is `claude:claude` unless noted.
 
 ### Git
-Git repo, branch `master`, author `support-hub-ops`. **Since 2026-10-06 it has a remote:** `origin` = `git@github-support-hub:kenmoredesign/support-hub.git`, a private repo under Alex's personal GitHub account `kenmoredesign` (a user account, not an organisation). First push 2026-10-06: 97 commits, 70 files. Head after the Codex LB switch and docs: `fc21e64`.
+Git repo, branch `master`, author `support-hub-ops`. **Since 2026-10-06 it has a remote:** `origin` = `git@github-support-hub:kenmoredesign/support-hub.git`, a private repo under Alex's personal GitHub account `kenmoredesign` (a user account, not an organisation). First push 2026-10-06: 97 commits, 70 files. Head after the Codex LB switch, docs and the `!status` fix: `3749b62`.
 
 - Deploy key `~claude/.ssh/gh-support-hub` on matrix (title `matrix` on GitHub, write access), ssh alias `github-support-hub` in `~claude/.ssh/config`, GitHub host keys pinned in `known_hosts`. `claude` pushes without sudo.
 - `.gitignore` excludes `.env*`, `secrets/`, `backups/`, every data directory, `.claude/`, `*.bak*`, `*.orig`, `*.dump`, `*.sql.gz`, `*.key`, `*.pem`, `**/auth.json*`, `**/registration.yaml`, `analysis/`.
@@ -120,9 +120,26 @@ The gateway no longer uses the ChatGPT login. Support Hub commits `022cf35` (cod
 - **No model, prompt or schema changes.** `/translate` and `/image` stay on `gpt-5.6-terra`, `/topmodel` on `gpt-5.6-sol`.
 - **Key-mode behaviour:** no token refresh, no `chatgpt-account-id` header, no device-login code in alerts (alerts explain the LB and key file instead). A missing, empty or rejected key is an auth failure: alert, unhealthy container, relay on DeepSeek.
 - **Cutover:** only `openai-gw` was rebuilt and recreated (`docker compose build openai-gw`, `up -d --no-deps openai-gw`, as root); all other container ids unchanged. Healthy 15 seconds after start.
-- **Tests through the LB, all passed:** translation via `/translate` (200, 2.7s, `gpt-5.6-terra`), `/topmodel` trivial prompt (200, 2.1s, `gpt-5.6-sol`), `/topmodel` with a trivial `json_schema` (200, strict JSON returned), `/health` 200, relay `/healthz` shows `active_provider: openai`. `/image` tested separately the same evening: one image in 26s, valid PNG, generator `gpt-image-2-codex`. Not tested: a real `!status` run, very large inputs.
+- **Tests through the LB, all passed:** translation via `/translate` (200, 2.7s, `gpt-5.6-terra`), `/topmodel` trivial prompt (200, 2.1s, `gpt-5.6-sol`), `/topmodel` with a trivial `json_schema` (200, strict JSON returned), `/health` 200, relay `/healthz` shows `active_provider: openai`. `/image` tested separately the same evening: one image in 26s, valid PNG, generator `gpt-image-2-codex`. A real `!status` ran through the LB at 21:59 UTC the same evening (23.5k tokens in). Not tested: inputs near the 1.1M-character cap.
 - **Rollback:** the previous image is tagged `support-hub-openai-gw:pre-codex-lb-20261006` (`b8f6571d0a82`). Either delete the two compose lines and `docker compose up -d --no-deps openai-gw` (new code, ChatGPT login), or additionally `docker tag support-hub-openai-gw:pre-codex-lb-20261006 support-hub-openai-gw:latest` first to go back to the old code too. `secrets/openai-gw/auth.json` was left in place for this; its access token expires 2026-10-09 and nothing refreshes it now, so a rollback after that date depends on the refresh token still being accepted, or on `python -m gw.setup_auth`.
 - `RUNBOOK.md` "OpenAI gateway" and `HANDOFF.md` describe key mode, key replacement and the rollback since Support Hub commit `80a51e8`.
+
+## `!status` posting bug, fixed 2026-10-06
+
+- **Symptom:** every `!status` failed after the model call with `!status failed: quote_from_bytes() expected bytes` and posted nothing. First seen 2026-10-06 21:49 and 21:52 UTC (`!status WFBL`).
+- **Cause:** in `_cmd_status` (`status/svc/api.py`) the variable `out` held the output room and was then overwritten with the model's JSON, which was passed to the poster as the room id. Introduced 2026-07-27 by `ed18579` (per-agent AI rooms); no `!status` had been run since, so it only surfaced now. Not related to the Codex LB switch: both `/topmodel` calls returned ok.
+- **Fix:** Support Hub commit `3749b62` (five-line rename, no prompt or schema change), pushed 2026-10-07. Only `status` was rebuilt and recreated (2026-10-06 21:58 UTC). Previous image kept as `support-hub-status:pre-statusfix-20261006` (`6c7ee9db72f1`), which has the bug.
+- **Confirmed:** Alex ran `!status WFBL` at 21:59 UTC and the briefing arrived (623 new messages, 8 facts written, `gpt-5.6-sol` through the LB, 60s). This was also the first real `!status` through the Codex LB.
+- The two failed runs wrote no state, bookmark or facts.
+
+## WhatsApp media over 50 MiB is not bridged (found 2026-10-07, fix pending)
+
+- **Cause:** `max_upload_size` is not set in `synapse/data/homeserver.yaml`, so Synapse's 50 MiB default applies. mautrix-whatsapp refuses larger media before uploading (`media too large (63.20 MB > 52.43 MB)`) and posts an `m.notice` in the client-side room: "Failed to bridge video attachment, please view it on the WhatsApp app". The relay drops every bridge notice (`relay/relay/service.py`, `_inbound`), so the agents' room shows nothing.
+- **Frequency:** six cases in the bridge logs since 2026-06-29: 2026-07-14 video 79.48 MB, 2026-09-09 file 58.56 MB, and the same 63.20 MB video four times on 2026-10-06 and 2026-10-07 (twice in a direct chat, twice in the `[INZO]` group, relay conversation 24). Synapse rejected no uploads and Caddy returned no 413s; Caddy has no body limit and the bridge talks to Synapse directly.
+- **Decided 2026-10-07, NOT yet applied:** `max_upload_size: 100M`, then restart `synapse`, then `mautrix-whatsapp` and `mautrix-telegram`. The edit needs root (file is owned by uid 991, mode 600, not in git). The root window had closed before it could be done.
+- **Missed videos cannot be re-fetched:** the bridge stored the message as the failure notice with no media details. After the limit is raised the video has to be sent or forwarded again in WhatsApp.
+- **Proposed, not built:** a relay change that turns the bridge's failed-media notice into a short marker in the agents' room only.
+- Bridge logs are in `bridges/whatsapp/data/logs/` (JSON, 100M rotation, back to 2026-06-29). Their debug lines contain display names, phone numbers and short-lived WhatsApp media tokens; filter to `error`/`warn` when reading them.
 
 ## How the stack authenticates to OpenAI
 
