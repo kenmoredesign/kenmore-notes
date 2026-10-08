@@ -382,3 +382,14 @@ removed, a stale unit still reports "active"); iptables has policy ACCEPT with o
 chains and one DROP for 160.20.109.0/24. Ports 22, 80 and 443 are open to the internet on IPv4
 and IPv6. Full capture in `kd-site-firewall-2026-10-08.txt`. Whether a Hetzner Cloud Firewall
 sits in front cannot be seen from the host.
+
+**SSH (checked 14:20 UTC, read-only).** Password login is off: `00-kenmore.conf` sets
+`PasswordAuthentication no`, `KbdInteractiveAuthentication no`, `PermitRootLogin prohibit-password`
+and `AllowUsers alex claude root`, and sshd offers only `publickey` to all three. A leftover
+`Match Group sftpjail` block in `sshd_config` still says `PasswordAuthentication yes` for
+esteban and denis, but `AllowUsers` shuts both out. `50-cloud-init.conf` is unreadable to
+`claude`; it is read after `00-kenmore.conf`, so it cannot override it. The Ops box connects over
+Tailscale (100.83.106.39). **Port 22 on the public IP times out from the Ops box**, so something
+upstream filters it (presumably a Hetzner Cloud Firewall), which corrects the note above that
+22 is open to the internet: it listens on all addresses, but is not reachable from outside as
+far as one test from one address shows.
