@@ -38,7 +38,7 @@ This is the template/demo host ("KenmoreSite"). It serves the Kenmore Design com
 
 | vhost | server_name(s) | Root | PHP socket |
 |---|---|---|---|
-| 000-default | `kenmoredesign.com`, `www.kenmoredesign.com` (live company site); `_` catch-all on 80 | `kdsites/site` (catch-all: `/var/www/html`) | php8.3 `www` |
+| 000-default | `kenmoredesign.com`, `www.kenmoredesign.com` (live company site); `_` catch-all on 80 | `kdsites/site` (catch-all: none, `return 444` since 2026-10-08) | php8.3 `www` |
 | dev | `dev.kenmoredesign.com` | `kdsites/dev` | php8.3 `www` |
 | dev2 | `dev2.kenmoredesign.com` | `kdsites/dev2` | php8.3 `www` |
 | broker1 | `meridianfx.kenmorefx.com` (also `broker1.kenmorefx.com`, `broker1.78.47.190.199.nip.io`, both 301 to meridianfx) | `kdtemplates/meridianfx` (note: no `/site`) | php8.3 `demos` |
@@ -66,6 +66,8 @@ This is the template/demo host ("KenmoreSite"). It serves the Kenmore Design com
 | kevsqlping | `kevsqlping.kenmorefx.net` (port 80 only) | `php-sql-test` (one `index.php`, 1.8K) | php8.1 `www` |
 | dittofeed-kenmoredesign | `ditto.kenmoredesign.com` | none: reverse proxy to `http://127.0.0.1:3000` | none |
 
+- **2026-10-08:** the port-80 catch-all (`default_server`, v4 and v6) used to have `root /var/www/html` and no PHP handler, so any file under the web root, `wp-config.php` and `kdsites/dev.zip` included, was downloadable by IP over plain HTTP. It now returns 444. Backup of the old file: `/root/nginx-backup-20261008/000-default`. Port 443 has no default block; requests by IP fall to the kenmoredesign.com vhost, which executes PHP. Credentials in the exposed files were not rotated as of this date.
+- **2026-10-08:** `claude` is in `adm` and can read `/var/log/nginx/*`.
 - Every `*.kenmorefx.com` demo is reached by its brand-name host. The `brokerN`/`propN` names and the `*.78.47.190.199.nip.io` names survive only as 301 redirects to the brand hosts (dated 2026-08-21, per the vhost template).
 - **Nothing is listening on port 3000**, so the `ditto.kenmoredesign.com` proxy backend is down. That vhost also references a certificate named `mailautomation.thebestprop.com`, which does not match its `server_name`.
 - Six unenabled files in `sites-available`: `site`, `premium.pre-certbot.bak`, `000-default.bak.20260910-215511`, `000-default.bak.20260910-225923`, `dev.bak.20260910-221637`, `dev.bak.20260910-225923`.

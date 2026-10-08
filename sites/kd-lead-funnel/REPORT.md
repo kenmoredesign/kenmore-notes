@@ -267,6 +267,8 @@ deletion list is written to `out/dev.kenmoredesign.com-send/sent.csv`. Waiting o
 All 26 use one email address; if SendPulse merges or rejects contacts by email, that will show
 in the log and is worth knowing for repeat enquirers.
 
+**Closed 2026-10-08 12:17 UTC.** The catch-all block now returns 444 (one edit in `000-default`, backup in `/root/nginx-backup-20261008/`). Verified by public IP on v4 and v6: `wp-config.php`, `dev.zip` and a real `_backups` zip get no reply; live, dev, a demo and 2sto still load. Credential rotation is still open. `claude` was added to `adm`, so nginx logs are now readable.
+
 ## Re-running the tests
 
 Scripts are in this directory; see `README.md`. Results and screenshots go to `out/` (not in git).
