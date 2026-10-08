@@ -121,6 +121,51 @@ back to the first (stacked) version.
       head -c -1 ~/notes/sites/alverix-page11-elementor-before-20261001-1340.json | ssh wp-eu 'sudo /usr/local/lib/kenmore-ops/wp alverix post meta update 11 _elementor_data'
       ssh wp-eu 'sudo /usr/local/lib/kenmore-ops/wp alverix elementor flush_css'
 
+## 2026-10-08: account types aligned to the client's source table
+
+Names are now **Standard / Raw / Prime** everywhere ("Raw Spread" → Raw, "Professional"/"Pro" → Prime).
+"accounts classified as professional" in the negative-balance FAQ is the regulatory category and was kept.
+
+**Values** (client source of truth): deposit $100 / $500 / $10,000; minimum FX spread From 1.2 / 0.2 / 0.2 pips;
+FX commission per side $0 / $3.50 / $2.50, per round turn $0 / $7 / $5; Up to 1:500 on all three;
+Margin Call / Stop Out 100% / 50%; currencies USD, EUR; support Standard / Priority / Personal manager;
+EAs, scalping and hedging allowed; swap-free on request; min volume 0.01 lot; market execution.
+Product codes (standard / raw / prime) are not used anywhere on the site.
+
+**Where account data lives**
+- `mu-plugins/kd-broker-sections.php`, `kd_broker_tiers()`: single source for the Home and Account Types
+  cards and for the full comparison table that the `[kd_broker_accounts]` shortcode now adds on `/accounts/`
+  (`kd_broker_compare()`, reusing the `.kdb-table` styles).
+- `mu-plugins/kd-education.php`: glossary leverage example (now "1:500 means $200 controls $100,000").
+- SVG panels referenced by attachment ID from Elementor image widgets. New files in `uploads/2026/10/`,
+  old ones in `2026/08/` kept: core-features-en-v2 (698, Platform `7de2662`), spreads-panel-en-v2 (699,
+  Home `1389999`), markets-grid-en-v2 (700, Home `006e274`), api-connectivity-en-v2 (701, About `b3ca73c`).
+  Safe-svg strips `role="img"` and whitespace on import; text and elements survive.
+- Elementor text: FAQ "typical spreads" on Account Types (9) and Contact (13), Home feature box `374f015`,
+  About stat `b052176` (0.2), Platform feature box `26020db` ("Personal account manager").
+- Also removed claims the source doesn't back: dedicated analyst, financing rates, Free VPS tiers, FIX/LD4
+  tied to Professional, and the AVG column of the spreads panel. Copy-trading box removed from the
+  connectivity diagram.
+
+**Backups**
+- DB: `/var/backups/kenmore-ops/alverix/20261008-103700-before.sql` and `…-after.sql`.
+- PHP: `kd-broker-sections.php.bak-20261008` and `kd-education.php.bak-20261008` next to the originals.
+- Review bundle (diffs, staged files, previews, screenshots): `/srv/incoming/alverix/account-types-20261008/`
+  and `/srv/incoming/alverix/review/account-types-20261008/` on the ops machine.
+
+**Rollback**
+
+    # as root on wp-eu
+    cd /var/www/alverix/public/wp-content/mu-plugins && for f in kd-broker-sections kd-education; do cp -p $f.php.bak-20261008 $f.php; done
+    # as claude
+    ssh wp-eu 'sudo /usr/local/lib/kenmore-ops/wp alverix db import /var/backups/kenmore-ops/alverix/20261008-103700-before.sql'
+    ssh wp-eu 'sudo /usr/local/lib/kenmore-ops/wp alverix elementor flush_css'
+
+**How file edits were done:** `claude` cannot write in `mu-plugins/` (owned by `alverix`) and the `wp`
+wrapper writes no files. PHP was staged in `/tmp/alverix-acct/` with SHA256SUMS and installed by root.
+SVGs went in with `media import --user=alverixadmin` (safe-svg only accepts SVG from a user with
+upload rights).
+
 ## Working notes (2026-10-01)
 - `sudo /usr/local/lib/kenmore-ops/wp alverix …` runs wp-cli as user `alverix`. Exports
   go to `/var/backups/kenmore-ops/alverix/`, which `claude` cannot list.
