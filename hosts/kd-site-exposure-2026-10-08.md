@@ -393,3 +393,19 @@ Tailscale (100.83.106.39). **Port 22 on the public IP times out from the Ops box
 upstream filters it (presumably a Hetzner Cloud Firewall), which corrects the note above that
 22 is open to the internet: it listens on all addresses, but is not reachable from outside as
 far as one test from one address shows.
+
+## Third root window, 14:44 to 14:48 UTC: salts and debug.log
+
+- The three stale `debug.log` copies (`kdsites/{site,dev,dev2}/wp-content/`) are in the
+  quarantine directory as `kdsites-<site>-debug.log`, with manifest entries.
+- **WordPress keys and salts shuffled on all 23 served installs** with `wp config shuffle-salts`:
+  dev, live, dev2, the ten brand demos, premium, the eight older templates, 2sto. For each one:
+  `wp-config.php` backed up to `/var/backups/kenmore-ops/changes-20261008/salts/` first (these
+  backups hold the old salts and the current database passwords; root-only), then verified by
+  hash that all 8 lines changed and no other line did, PHP lint, owner and mode unchanged, home
+  page status equal to before. No install shares an `AUTH_KEY` with another any more; dev and
+  live had identical salts until now.
+- Not touched: unserved trees (`site_old`, `ninjacharge/old`, `webdesign/gea`), `WP_CACHE_KEY_SALT`,
+  `DUPLICATOR_AUTH_KEY`, database passwords.
+- Effects: everyone is logged out of every site; pages cached by WP Rocket before the shuffle
+  carry stale content-protector nonces until the cache is cleared or expires (24 h).
