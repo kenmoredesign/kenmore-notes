@@ -186,3 +186,13 @@ All `support-hub-*`, all up 9 days.
 | openai-gw | `support-hub-openai-gw` | 127.0.0.1:7500 | **unhealthy** |
 
 `openai-gw` unhealthy: see "OpenAI gateway" above.
+
+## Agent messages with a WhatsApp mention lost their line breaks (fix deployed 2026-10-08, not yet confirmed)
+
+- **Symptom:** an agent's message with a numbered list, bullets and paragraphs arrived in WhatsApp as one block ("flow:1. The…"). First reported for kate's message in the `[INZO]` group (relay conversation 24) at 17:59 UTC on 2026-10-08.
+- **Cause:** only messages that mention a WhatsApp participant get a `formatted_body` from the relay (`_wa_mention_html` in `relay/relay/service.py`, needed for the native ping). It was the escaped plain text with raw newlines and no `<br/>`. The bridge sends `formatted_body` when present and drops raw newlines in HTML. The relay's `body` was correct, and messages without a mention were never affected. Translation was not involved.
+- **Fix:** Support Hub commit `86f131e`: newlines become `<br/>` in `_wa_mention_html` (one line), plus the dependency-free test `relay/tests/test_wa_mention_html.py`. Pushed 2026-10-08 together with `4243f11` and `1044470`; GitHub head is `86f131e`.
+- **Deployed 2026-10-08 19:26:36 UTC:** only `relay` rebuilt and recreated (`--no-deps`) after 245 quiet seconds in its log; healthy in about 3 seconds; the other eight container ids unchanged. Previous image kept as `support-hub-relay:pre-linebreak-20261008` (`b19c29b0af5e`). Rollback: `docker tag support-hub-relay:pre-linebreak-20261008 support-hub-relay:latest`, then `docker compose up -d --no-deps relay`.
+- **Not yet confirmed by a real test.** Alex will send a message with a mention, bullets and a numbered step on 2026-10-09 with a coworker. Seen so far: one outbound message at 19:29:25 UTC (conversation 33, WhatsApp direct chat) was mirrored normally by the new relay and carried a mention, but it was a single line, so it does not prove the line breaks.
+- **Mirroring by the relay after the 06:31 UTC marker deploy** is confirmed by the day's log (inbound and outbound messages mirrored through the day). The failed-media marker itself has still not fired.
+- **Not changed:** WhatsApp shows the agent's plain `body`, so Element markdown such as `**bold**` arrives literally (WhatsApp wants `*bold*`). Same with or without a mention.
