@@ -257,3 +257,59 @@ Proposal only; nothing moved or deleted.
   four would free about 10 G.
 - Whatever stays under `/var/www/html` should be covered by a deny rule in **every** vhost, not
   only kenmoredesign.com: archives, `.sql`, logs, `error_log`, and dot-directories such as `.git`.
+
+## Follow-up checks, same day (read-only)
+
+**Backdoors in `webdesign/chass/site_old`.** The two gallery files are PHP webshells: each is
+`<?php`, about 250 spaces of padding, then obfuscated code that runs whatever is sent in a POST
+field through `base64_decode`. They are not alone: 202 files in that tree carry the same padding
+trick and 128 the same two signatures (`.php` files with `.inf` twins, spread through the
+`nextgen-gallery` and `kenmore-design` plugin folders, plus `site_old/post.php`). All are dated
+2016-01-06, owned by root, mode 775: an infection from the site's previous hosting that was
+copied here with the archive. No other tree under `/var/www/html` matches these signatures (a
+signature scan, not a full malware audit). **They cannot run here:** no vhost, symlink or cron
+points into `webdesign/chass`, and the old catch-all served files without executing PHP. No
+request for them appears in 15 days of logs. `chass.zip`, `chass/site.zip` and
+`site/post-restore.zip` in the same folder were not inspected and may hold copies. Nothing was
+touched.
+
+**`2sto.net/site.zip` contents:** 9,215 entries, newest dated 2023-11-09. WordPress core,
+plugins, themes, 137 upload files (images, css), `site/wp-config.php` (2023-08-10) and
+`site/error_log`. No database dump, no export, no user data files. It is the same 2023 package
+as `executive/site/site.zip`. Whether its database password is still in use anywhere was not
+checked.
+
+**The four downloaders** are automated secret-harvesting scanners, not people:
+
+| IP | Requests, 15 days | Vhosts | User agent | Around the download |
+|---|---|---|---|---|
+| 195.178.110.131 | 495 | 2sto, live, ninjacharge | Chrome 133 on Windows (5 truncated, 2 `Go-http-client`) | Loaded 2sto's home, `?phpinfo=1`, `wp-login.php` (GET only), then `site.zip`; went straight on to `/backup.zip`, `/.env`, `composer.json` and similar, all 404. On 7 Oct crawled 13 pages of kenmoredesign.com and GET `wp-login.php` |
+| 195.178.110.15 | 632 | 2sto, ninjacharge | Chrome 124 on Windows | `site.zip` twice (30 Sep, 2 Oct), then 166 probes for `.env` variants and config backups, all 404 |
+| 93.123.109.55 | 352 | 2sto | Chrome 124 on Windows | `site.zip` twice (26 Sep, 4 Oct), then probes for `.aws/credentials`, CI configs, `.bash_history`; all 301/404 |
+| 149.88.76.100 | 109 | 2sto | Chrome 121 on Windows | 107 archive-name guesses, one hit: `site.zip` (2 Oct) |
+
+None of the four sent a single POST to any vhost, and none requested `wp-admin` after a
+download apart from the GETs above. Other addresses in the same /24s scan dev2, premium,
+prestige and ninjacharge the same way. A log shows requests to this host only; it cannot show
+whether the database password was tried elsewhere.
+
+**dev2 `debug.log` is public** (`https://dev2.kenmoredesign.com/wp-content/debug.log`, 200,
+108,951 bytes) and was fetched 6 times by scanners between 24 Sep and 5 Oct. dev2's vhost has
+none of the deny rules that live and dev have.
+
+**MySQL** listens on 127.0.0.1 only (3306 and 33060; `bind-address` and `mysqlx-bind-address`
+both 127.0.0.1) and both ports are closed from the Ops box over the public IP. ufw is active;
+its rules need root to read. **No phpMyAdmin or Adminer** exists under `/var/www/html`
+(`vendor/phpmyadmin` inside WPML is only the sql-parser library). The one database tool is
+`ninjacharge/old/se.php`, which no vhost serves.
+
+**Git remotes:** none of the seven `.git/config` files has a password or token in its remote
+URL. The six theme-asset repos point at github.com over a plain URL; `ninjacharge/git` uses an
+ssh remote with a user name only. **The whole theme-asset repository can be cloned over HTTP**
+from www.kenmoredesign.com: `config`, `HEAD`, `index`, `packed-refs`, `logs/HEAD`,
+`refs/heads/master` and the 3.6 M pack file all return 200.
+
+**SendPulse token cache:** yes, one place. `set_transient('sendpulse_access_token', …, 55 min)`.
+There is no object-cache drop-in, so it is a row in `wp_options` of whichever site ran the
+handler, and so it is also inside any database dump taken while it was fresh. A token is valid
+for an hour, so the ones in old dumps are dead. Nothing is written to disk or to a log.
