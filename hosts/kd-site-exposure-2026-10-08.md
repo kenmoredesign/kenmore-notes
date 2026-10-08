@@ -313,3 +313,38 @@ from www.kenmoredesign.com: `config`, `HEAD`, `index`, `packed-refs`, `logs/HEAD
 There is no object-cache drop-in, so it is a row in `wp_options` of whichever site ran the
 handler, and so it is also inside any database dump taken while it was fresh. A token is valid
 for an hour, so the ones in old dumps are dead. Nothing is written to disk or to a log.
+
+## Further read-only checks, 13:30 to 14:00 UTC
+
+**Password in the leaked zips (hash-only comparison of the `DB_PASSWORD` line).** The 2sto and
+executive zips hold the same password. It does **not** match the current `wp-config.php` of
+2sto, executive or success. It **does** match two unserved files: `clientsites/2sto/site_old/wp-config.php`
+and `kdtemplates/executive/site_old/wp-config.php` (database `kd_executive`). The success zip's
+password matches no current file on this host. Whether the MySQL account behind the old
+password still exists was not checked (needs MySQL root); MySQL is local-only either way.
+
+**Legitimate archive downloads, 15 days:** only the two installers
+(`Forex-CRM-Setup-1.0.0.exe.zip`, `Forex-CRM-1.0.0-arm64-mac.zip`), on live, and the same two
+file names on dev and dev2 (almost all from the server's own address, 3 from outside on dev).
+Everything else that returned an archive was `2sto.net/site.zip` to scanners.
+
+**PHP under uploads and gallery directories:** 198 files, full list in
+`kd-site-uploads-php-2026-10-08.tsv`. Outside `webdesign/chass/site_old` (32 backdoor files in
+its gallery folders) everything is of an expected kind: 127 compiled Blade views in
+`kdsites/{site,dev,dev2}/wp-content/uploads/cache/<sha1>.php` (Sage theme), 33 WPML compiled
+Twig templates in victory, 4 `index.php` placeholders, and `uploads/stm_fonts/stm/charmap.php`
+(11.5 K, an icon-font page shipped by the old "consulting" theme) in the two unserved
+`site_old` trees. Only names and dates were read.
+
+**Theme-asset repo history:** 2 commits in `assets/kenmore`, 5 in `assets/kenmore/kenmore`,
+all from July 2020, front-end files only (svg, scss, png, html, css, js). No file with a
+sensitive name in any commit and no added line matching a key, token, password or private-key
+pattern. Nothing secret to rotate because of the clone exposure.
+
+**dev2 `debug.log`:** 312 lines, all from 22 minutes on 2026-04-16; identical copies sit in
+site and dev. Contents by kind: 303 PHP notices, warnings and deprecations that show absolute
+server paths and plugin names; and 2 lines written by an earlier debug version of the SendPulse
+handler: one full "create contact" API response (one contact with name, phone and an email at
+`test.com`, plus SendPulse's internal IDs) and one contact ID. No password, key, token,
+Authorization header, SQL or IP address. `WP_DEBUG` is `false` in all three configs and the file
+has not grown since April, so debug logging is already off; the file is a leftover.
