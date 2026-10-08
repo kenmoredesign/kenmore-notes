@@ -280,7 +280,7 @@ that (216 or 218 bytes).
 |---|---|
 | POSTs to `admin-ajax.php` on live | 1,288 |
 | of which Action Scheduler loopbacks from the server itself (kenmore-translate queue) | 920 |
-| of which WP Rocket front-end beacons and wp-admin traffic | about 190 |
+| of which WP Rocket front-end beacons and wp-admin traffic | about 180 |
 | of which bots: 301 (wrong host), 400 (no action), 403 | 144 |
 | **Form submissions answered with the success message** | **41**, from 34 IPs, about 2.7 a day |
 | Form submissions dropped by the honeypot or timer | 2 |
