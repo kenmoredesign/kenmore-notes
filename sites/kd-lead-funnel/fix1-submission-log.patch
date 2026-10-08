@@ -1,0 +1,147 @@
+--- a/wp-content/themes/sage/app/actions.php
++++ b/wp-content/themes/sage/app/actions.php
+@@ -22,12 +22,14 @@
+ 
+     if (is_wp_error($response)) {
+         error_log('SendPulse token error: ' . $response->get_error_message());
++        $GLOBALS['kd_sendpulse_error'] = 'token: ' . $response->get_error_message();
+         return false;
+     }
+ 
+     $body = json_decode(wp_remote_retrieve_body($response), true);
+     if (empty($body['access_token'])) {
+         error_log('SendPulse token error: ' . wp_remote_retrieve_body($response));
++        $GLOBALS['kd_sendpulse_error'] = 'token: ' . wp_remote_retrieve_body($response);
+         return false;
+     }
+ 
+@@ -59,6 +61,7 @@
+ 
+     if (is_wp_error($response)) {
+         error_log("SendPulse API error ($endpoint): " . $response->get_error_message());
++        $GLOBALS['kd_sendpulse_error'] = "$endpoint: " . $response->get_error_message();
+         return false;
+     }
+ 
+@@ -67,6 +70,7 @@
+ 
+     if ($code >= 400) {
+         error_log("SendPulse API $code ($endpoint): " . wp_remote_retrieve_body($response));
++        $GLOBALS['kd_sendpulse_error'] = "$endpoint: HTTP $code " . wp_remote_retrieve_body($response);
+         return false;
+     }
+ 
+@@ -182,10 +186,72 @@
+ }
+ 
+ /**
++ * Submission log. Every form POST is written to the database before SendPulse is
++ * called and then updated with the API result, so a lead survives a SendPulse failure
++ * and losses can be counted.
++ *
++ * status: received (SendPulse not yet answered), created, created_partial (contact made,
++ * phone or messenger call failed), failed, honeypot, too_fast.
++ *
++ * The table has no wp_ prefix and carries the database name, so migrate-dev-to-live.sh
++ * ('wp db clean' plus an import of dev's dump) neither drops nor overwrites live's rows.
++ * Logging must never break a submission: every error here is swallowed.
++ */
++function kd_lead_log($status, $id = 0, $contact_id = null, $error = null) {
++    global $wpdb;
++    try {
++        $table = 'leadlog_' . preg_replace('/\W/', '_', DB_NAME);
++        $show  = $wpdb->suppress_errors(true);
++
++        if ($id) {
++            $wpdb->update($table, [
++                'status'        => $status,
++                'sp_contact_id' => $contact_id,
++                'sp_error'      => $error ? mb_substr($error, 0, 2000) : null,
++            ], ['id' => $id]);
++            $wpdb->suppress_errors($show);
++            return $id;
++        }
++
++        $wpdb->query("CREATE TABLE IF NOT EXISTS `$table` (
++            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
++            created_at DATETIME NOT NULL,
++            status VARCHAR(20) NOT NULL,
++            sp_contact_id VARCHAR(40) NULL,
++            sp_error TEXT NULL,
++            ip VARCHAR(45) NULL,
++            country VARCHAR(2) NULL,
++            user_agent VARCHAR(255) NULL,
++            payload LONGTEXT NOT NULL,
++            KEY created_at (created_at),
++            KEY status (status)
++        ) DEFAULT CHARSET=utf8mb4");
++
++        $payload = wp_unslash($_POST);
++        unset($payload['action']);
++        $wpdb->insert($table, [
++            'created_at' => gmdate('Y-m-d H:i:s'),
++            'status'     => $status,
++            'ip'         => substr($_SERVER['REMOTE_ADDR'] ?? '', 0, 45),
++            'country'    => substr($_SERVER['HTTP_CF_IPCOUNTRY'] ?? '', 0, 2),
++            'user_agent' => mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255),
++            'payload'    => wp_json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR),
++        ]);
++        $id = (int) $wpdb->insert_id;
++        $wpdb->suppress_errors($show);
++        return $id;
++    } catch (\Throwable $e) {
++        error_log('Lead log error: ' . $e->getMessage());
++        return 0;
++    }
++}
++
++/**
+  * AJAX handler for contact form submissions
+  */
+ function send_message() {
+     if (!empty($_POST['website_url'])) {
++        kd_lead_log('honeypot');
+         echo 'Thank you for your message!';
+         wp_die();
+     }
+@@ -193,11 +259,15 @@
+     if (isset($_POST['form_time'])) {
+         $form_time = intval($_POST['form_time']);
+         if (time() - $form_time < 3) {
++            kd_lead_log('too_fast');
+             echo 'Thank you for your message!';
+             wp_die();
+         }
+     }
+ 
++    $log_id = kd_lead_log('received');
++    $GLOBALS['kd_sendpulse_error'] = null;
++
+     // Fill IP city/timezone server-side if not provided by Cloudflare
+     $ip_city     = $_POST['ip_city'] ?? '';
+     $ip_timezone = $_POST['ip_timezone'] ?? '';
+@@ -238,7 +308,13 @@
+ 
+     $contact_id = sendpulse_create_contact($form_data);
+ 
++    if (!$contact_id) {
++        kd_lead_log('failed', $log_id, null, $GLOBALS['kd_sendpulse_error'] ?: 'no contact id returned');
++    }
++
+     if ($contact_id) {
++        $GLOBALS['kd_sendpulse_error'] = null;
++
+         if (!empty($form_data['phone'])) {
+             sendpulse_api('POST', "/contacts/{$contact_id}/phones", [
+                 'phone' => sanitize_text_field($form_data['phone']),
+@@ -252,6 +328,10 @@
+                 'login'  => sanitize_text_field($form_data['im']),
+             ]);
+         }
++
++        // Set if the phone or the messenger call failed.
++        $sub_error = $GLOBALS['kd_sendpulse_error'];
++        kd_lead_log($sub_error ? 'created_partial' : 'created', $log_id, (string) $contact_id, $sub_error);
+     }
+ 
+     $meta = [

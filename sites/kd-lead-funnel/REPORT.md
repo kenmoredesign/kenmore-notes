@@ -218,6 +218,55 @@ read, PostHog read key, nginx/PHP log access. 12-month source breakdown blocked 
 UNLOCKS: fix 1 (store + log each submission) gives a real loss number in a week; fix 3 makes CRM geo usable.
 ```
 
+## Update 2026-10-08
+
+**Urgent, outside the audit scope: kd-site serves raw files by IP.** The port-80 catch-all
+vhost in `000-default` has `root /var/www/html` and no PHP handler, so
+`http://78.47.190.199/kdsites/site/wp-config.php` answers `200`, `application/octet-stream`,
+3731 bytes, from the Ops box over the public address. `kdsites/dev.zip` (2.8 GB, a full copy of
+dev) answers 200 too. Directory listing is off (`_backups/` gives 403), but the restore-point
+zips have dated, guessable names. Checked with HEAD requests only; no body was downloaded.
+Every `wp-config.php` under `/var/www/html` is presumably reachable the same way. Closing it
+needs root (make the catch-all `return 444;`), then the database password, the SendPulse
+secret, the WordPress salts and any other key in those files should be treated as disclosed.
+This also rules out keeping a lead log as a file anywhere under `/var/www/html`.
+
+**dev and live use the same SendPulse credentials.** SHA-256 of the three `SENDPULSE_*` lines,
+whitespace-normalised: match. Test leads from dev land in the live CRM.
+
+**September bug: closed** by the owner; leads recovered. No further loss-dating.
+
+**Parked** until the Ops secrets wrapper exists: SendPulse and PostHog API comparison, step 4.
+
+**Fix 1 (submission log) is written, linted, and not deployed.** `fix1-submission-log.patch`
+changes one file, `themes/sage/app/actions.php`:
+
+- Every POST to `send_message` is inserted into a table before SendPulse is called, then
+  updated with the result. Columns: time (UTC), status, SendPulse contact id, SendPulse error
+  text, IP, `CF-IPCountry` read at submit time, user agent, the posted fields as JSON.
+- Status is `received`, `created`, `created_partial` (contact made, phone or messenger call
+  failed), `failed`, `honeypot` or `too_fast`. A row left at `received` means PHP died mid-call.
+- The table is `leadlog_<database name>`, with no `wp_` prefix. `migrate-dev-to-live.sh` runs
+  `wp db clean` (prefixed tables only) and imports dev's dump, so a prefixed or shared name
+  would be wiped or overwritten on every migration. With this name live's rows survive; dev's
+  own log table arrives as an extra table and can be ignored.
+- What the visitor sees and what is sent to SendPulse are unchanged. A logging error can never
+  break a submission.
+- Read it with `sudo /usr/local/lib/kenmore-ops/wp site db query "SELECT id, created_at, status, sp_contact_id, sp_error FROM leadlog_kenmore_sage ORDER BY id DESC LIMIT 50"`.
+
+It is not deployed because the only wrapper on kd-site is `wp`, which cannot replace a file,
+and host changes go through a wrapper. `~/ops/bin/theme-file` is written for this (replace one
+existing theme file from stdin, PHP lint, copy before and after to
+`/var/backups/kenmore-ops/theme/`, print both checksums) and needs a root install.
+
+**Test leads: ready, not sent.** `node forms.js --send --plan --email ADDR` sends 26 leads from
+dev: one baseline per language across the three form types and both widths, then phones,
+messengers, non-Latin names, a 220-character company and five website variants (bare domain,
+`www.`, full URL, "none yet", free text with spaces). Names and company start with TEST. The
+deletion list is written to `out/dev.kenmoredesign.com-send/sent.csv`. Waiting on the address.
+All 26 use one email address; if SendPulse merges or rejects contacts by email, that will show
+in the log and is worth knowing for repeat enquirers.
+
 ## Re-running the tests
 
 Scripts are in this directory; see `README.md`. Results and screenshots go to `out/` (not in git).

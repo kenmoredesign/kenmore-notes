@@ -1,11 +1,15 @@
 #!/usr/bin/env node
-// forms.js [--base dev|prod] [--send] [--langs en,ar] [--pages home,contact,pdf] [--edge] [--out DIR]
+// forms.js [--base dev|prod] [--send --email ADDR] [--plan] [--langs en,ar] [--pages home,contact,pdf] [--edge] [--out DIR]
 //
 // Walks every lead form in every language at desktop and phone widths.
 //   default      capture mode: the lead POST is intercepted in the browser, nothing reaches
 //                the server or SendPulse. Safe to run against prod (it still loads pages only).
 //   --send       really submit. Dev only (lib.js refuses any other host). Every submission
-//                is labelled TEST. Dev shares the live SendPulse CRM unless proven otherwise.
+//                is labelled TEST and uses --email (required). dev's SendPulse credentials
+//                are the same as live's (checked 2026-10-08), so these land in the live CRM.
+//                Writes sent.csv, the list to delete from the CRM afterwards.
+//   --plan       run the fixed 26-lead plan (PLAN below) instead of the full matrix:
+//                one baseline per language, then the edge inputs incl. free-text websites.
 //   --edge       also run the edge-case inputs (phones, non-Latin names, long company, TLDs).
 // Stops at the first Cloudflare challenge or CAPTCHA.
 const fs = require('fs');
@@ -17,13 +21,15 @@ const has = (n) => process.argv.includes('--' + n);
 const base = arg('base', 'dev') === 'prod' ? L.PROD : L.DEV;
 const send = has('send');
 if (send && base !== L.DEV) { console.error('--send is dev only'); process.exit(2); }
+const email = arg('email', null);
+if (send && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(email))) { console.error('--send needs --email ADDR (an address you control)'); process.exit(2); }
 const langs = arg('langs', L.LANGS.join(',')).split(',');
 const pages = arg('pages', Object.keys(L.PAGES).join(',')).split(',');
 const out = arg('out', path.join(__dirname, 'out', new URL(base).host + (send ? '-send' : '')));
 fs.mkdirSync(out, { recursive: true });
 
 const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
-const BASE = { firstname: 'TEST Anna', lastname: 'TEST Probe', email: 'test+kd@example.com', company: 'TEST - ignore', message: `TEST submission ${stamp}, please ignore` };
+const BASE = { firstname: 'TEST Anna', lastname: 'TEST Probe', email: email || 'test+kd@example.com', company: 'TEST Kenmore audit', message: `TEST submission ${stamp}, please ignore` };
 const EDGE = {
   'phone +971 spaced': { contact: ['phone', '+971 50 123 4567'] },
   'phone 0044 prefix': { contact: ['phone', '0044 7911 123456'] },
@@ -31,10 +37,10 @@ const EDGE = {
   'whatsapp +7 dashes': { contact: ['whatsapp', '+7 (495) 123-45-67'] },
   'telegram @handle': { contact: ['telegram', '@test_handle'] },
   'messenger picked, left empty': { contact: ['telegram', ''] },
-  'name Arabic': { firstname: 'TEST محمد', lastname: 'الأحمد' },
-  'name Chinese': { firstname: 'TEST 王', lastname: '小明' },
-  'name Cyrillic': { firstname: 'TEST Алексей', lastname: 'Щербаков' },
-  "name O'Brien-Smith": { firstname: "TEST Seán", lastname: "O'Brien-Smith" },
+  'name Arabic': { firstname: 'TEST محمد', lastname: 'TEST الأحمد' },
+  'name Chinese': { firstname: 'TEST 王', lastname: 'TEST 小明' },
+  'name Cyrillic': { firstname: 'TEST Алексей', lastname: 'TEST Щербаков' },
+  "name O'Brien-Smith": { firstname: "TEST Seán", lastname: "TEST O'Brien-Smith" },
   'company 220 chars': { company: 'TEST ' + 'International Brokerage Holdings and Proprietary Trading Group '.repeat(4).slice(0, 215) },
   'email new TLD': { email: 'test@firm.technology' },
   'email IDN domain': { email: 'test@пример.рф' },
@@ -43,8 +49,19 @@ const EDGE = {
   'email trailing space': { email: 'test+kd@example.com ' },
   'website bare domain': { website: 'testcompany.com' },
   'website free text': { website: 'none yet' },
+  'website www no scheme': { website: 'www.testcompany.com' },
+  'website full URL': { website: 'https://testcompany.com/about?x=1' },
+  'website with spaces': { website: 'Test Company Ltd (site coming soon)' },
   'message multiline + emoji': { message: 'TEST line one\nline two 🚀\n"quotes" & <tags>' },
 };
+
+// The fixed send plan: [viewport, language, page, case]. 26 leads.
+const PLAN = [
+  ...L.LANGS.map((l, i) => [i % 2 ? 'mobile' : 'desktop', l, ['home', 'contact', 'pdf'][i % 3], 'baseline']),
+  ...['phone +971 spaced', 'phone 0044 prefix', 'whatsapp +7 dashes', 'telegram @handle', 'name Arabic', 'name Chinese', 'name Cyrillic',
+    "name O'Brien-Smith", 'company 220 chars', 'website bare domain', 'website free text', 'website www no scheme', 'website full URL',
+    'website with spaces', 'message multiline + emoji'].map((c, i) => [i % 2 ? 'desktop' : 'mobile', ['en', 'ar', 'zh'][i % 3], 'contact', c]),
+].slice(0, 26);
 
 async function reveal(page) { // wow.js keeps sections hidden until scrolled into view
   for (let y = 0; y < 4000; y += 400) { await page.mouse.wheel(0, 400); await page.waitForTimeout(60); }
@@ -124,10 +141,14 @@ async function layout(page, form) {
   const results = [];
   const save = () => fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify(results, null, 1));
   try {
+    const matrix = [];
     for (const vp of Object.keys(L.VIEWPORTS)) for (const lang of langs) for (const pg of pages) {
-      const cases = { 'empty submit': null, baseline: {} };
-      if (has('edge') && pg === 'contact') Object.assign(cases, EDGE);
-      for (const [name, over] of Object.entries(cases)) {
+      matrix.push([vp, lang, pg, 'empty submit'], [vp, lang, pg, 'baseline']);
+      if (has('edge') && pg === 'contact') for (const c of Object.keys(EDGE)) matrix.push([vp, lang, pg, c]);
+    }
+    {
+      for (const [vp, lang, pg, name] of has('plan') ? PLAN : matrix) {
+        const over = name === 'empty submit' ? null : (EDGE[name] || {});
         if (send && name === 'empty submit') continue;
         const ctx = await browser.newContext(L.VIEWPORTS[vp]); const page = await ctx.newPage();
         const sink = [], jsErrors = [];
@@ -143,7 +164,8 @@ async function layout(page, form) {
           row.opened = how;
           if (form) {
             if (name === 'empty submit') row.layout = await layout(page, form);
-            if (over) await fill(form, { ...BASE, ...over, ...(send ? { message: `${BASE.message} [${vp}/${lang}/${pg}/${name}]` } : {}) });
+            const data = over && { ...BASE, ...over, ...(send ? { email } : {}), ...(send && !over.message ? { message: `${BASE.message} [${vp}/${lang}/${pg}/${name}]` } : {}) };
+            if (data) { await fill(form, data); row.sentAt = new Date().toISOString(); row.data = data; }
             Object.assign(row, await submit(page, form, sink));
             if (name === 'empty submit' || (over && Object.keys(over).length === 0)) await page.screenshot({ path: path.join(out, `${vp}-${lang}-${pg}-${name.replace(/\W+/g, '_')}.png`) });
           }
@@ -162,5 +184,13 @@ async function layout(page, form) {
   } catch (e) {
     console.error(e instanceof L.Blocked ? `STOPPED: ${e.message}` : e.stack);
     process.exitCode = 1;
-  } finally { save(); await browser.close(); }
+  } finally {
+    save();
+    if (send) { // the list to delete from the CRM
+      const q = (v) => '"' + String(v ?? '').replace(/"/g, '""').replace(/\n/g, ' ') + '"';
+      fs.writeFileSync(path.join(out, 'sent.csv'), ['sent_at_utc,viewport,lang,page,case,firstname,lastname,company,email,http,posted',
+        ...results.filter((r) => r.posted).map((r) => [r.sentAt, r.vp, r.lang, r.page, r.case, r.data.firstname, r.data.lastname, r.data.company.slice(0, 40), r.data.email, r.status, r.posted].map(q).join(','))].join('\n') + '\n');
+    }
+    await browser.close();
+  }
 })();
