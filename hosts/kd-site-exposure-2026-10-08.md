@@ -348,3 +348,37 @@ handler: one full "create contact" API response (one contact with name, phone an
 `test.com`, plus SendPulse's internal IDs) and one contact ID. No password, key, token,
 Authorization header, SQL or IP address. `WP_DEBUG` is `false` in all three configs and the file
 has not grown since April, so debug logging is already off; the file is a leftover.
+
+## Second root window, 13:40 to 13:50 UTC: what changed
+
+Backups of everything edited: `/var/backups/kenmore-ops/changes-20261008/` (all 33 files of
+`/etc/nginx/sites-available/` under `nginx/`, and `migrate-dev-to-live.sh`).
+
+1. **Quarantine**, `/var/backups/kenmore-ops/quarantine/` (root, 700), with `MANIFEST.txt`:
+   `2sto-site.zip`, `executive-site.zip` (byte-identical to the 2sto one), `success-successnew.zip`,
+   and the whole `webdesign/chass` tree as `webdesign-chass/` (5,729 files, 220 M; contains the
+   PHP backdoors; moved as one rename, nothing inside opened).
+2. **Restore points:** the 8 zips, 12 migrate logs and `dev.zip` are in
+   `/var/backups/kenmore-ops/kdsites/` (root, 700, files 600). `kdsites/_backups/` is left empty.
+   `migrate-dev-to-live.sh` line 24 is now `BACKUP_DIR="/var/backups/kenmore-ops/kdsites"`.
+3. **nginx:** new `/etc/nginx/snippets/kenmore-deny.conf` (dotfiles except `.well-known`;
+   `error_log`, `.log`, `.sql`, `.zip`, `.gz`, `.tgz`, `.tar`, `.bz2`, `.7z`, `.rar`, `.bak`),
+   included after `server_name` in 46 server blocks across 26 vhost files. `nginx -t` passed, reloaded.
+   Files that must be served need an exact-match location, as the two installers have on live
+   and dev. dev2 has none, so its duplicate installers now return 403.
+4. **Verified:** at the origin the three zips, three `error_log`s, dev2's `debug.log`, every
+   `.git` path including the pack file, `.tmb`, `.htaccess` and dev2's loose zips return 403.
+   `.well-known/acme-challenge/` still reaches its location (404 for a missing token, not 403).
+   The two installers still download on live and dev. All 41 hostnames give the same status as
+   before the change (24 return 200; `progress` 500 and `ditto` 502 were already so).
+
+**Still served by Cloudflare's cache:** the three zip URLs return 200 with `cf-cache-status: HIT`
+(`max-age=14400`) although the origin now answers 403. The cache entries date from 12:28 UTC,
+which is when the HEAD checks from the Ops box were made: Cloudflare turns a HEAD for a
+cacheable file into a full fetch and stores it. They expire by about 16:30 UTC or on a purge.
+
+**Firewall, corrected:** there is no host firewall on kd-site. `ufw` is not installed (package
+removed, a stale unit still reports "active"); iptables has policy ACCEPT with only Tailscale's
+chains and one DROP for 160.20.109.0/24. Ports 22, 80 and 443 are open to the internet on IPv4
+and IPv6. Full capture in `kd-site-firewall-2026-10-08.txt`. Whether a Hetzner Cloud Firewall
+sits in front cannot be seen from the host.

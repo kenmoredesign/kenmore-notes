@@ -1,0 +1,76 @@
+# kd-site firewall state, captured 2026-10-08T13:42:23Z as root. Read-only capture, nothing changed.
+
+## ufw
+rc ufw 0.36.2-6
+ls: cannot access '/usr/sbin/ufw': No such file or directory
+active
+ufw.service is not a native service, redirecting to systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install is-enabled ufw
+enabled
+● ufw.service
+     Loaded: not-found (Reason: Unit ufw.service not found.)
+     Active: active (exited) since Wed 2026-05-27 13:37:19 UTC; 4 months 12 days ago
+   Main PID: 495 (code=exited, status=0/SUCCESS)
+        CPU: 4ms
+
+after6.rules after.init after.rules applications.d before6.rules before.init before.rules sysctl.conf ufw.conf user6.rules user.rules 
+ENABLED=no
+-A ufw-user-limit -m limit --limit 3/minute -j LOG --log-prefix "[UFW LIMIT BLOCK] "
+-A ufw-user-limit -j REJECT
+-A ufw-user-limit-accept -j ACCEPT
+
+## iptables -S (IPv4)
+-P INPUT ACCEPT
+-P FORWARD ACCEPT
+-P OUTPUT ACCEPT
+-N ts-forward
+-N ts-input
+-A INPUT -j ts-input
+-A INPUT -s 160.20.109.0/24 -j DROP
+-A FORWARD -j ts-forward
+-A ts-forward -i tailscale0 -j MARK --set-xmark 0x40000/0xff0000
+-A ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
+-A ts-forward -s 100.64.0.0/10 -o tailscale0 -j DROP
+-A ts-forward -o tailscale0 -j ACCEPT
+-A ts-input -s 100.83.106.39/32 -i lo -j ACCEPT
+-A ts-input -i tailscale0 -j ACCEPT
+-A ts-input -p udp -m udp --dport 41641 -j ACCEPT
+-A ts-input -s 100.115.92.0/23 ! -i tailscale0 -j RETURN
+-A ts-input -s 100.64.0.0/10 ! -i tailscale0 -j DROP
+
+## ip6tables -S
+-P INPUT ACCEPT
+-P FORWARD ACCEPT
+-P OUTPUT ACCEPT
+-N ts-forward
+-N ts-input
+-A INPUT -j ts-input
+-A FORWARD -j ts-forward
+-A ts-forward -i tailscale0 -j MARK --set-xmark 0x40000/0xff0000
+-A ts-forward -m mark --mark 0x40000/0xff0000 -j ACCEPT
+-A ts-forward -o tailscale0 -j ACCEPT
+-A ts-input -s fd7a:115c:a1e0::f53b:6a28/128 -i lo -j ACCEPT
+-A ts-input -i tailscale0 -j ACCEPT
+-A ts-input -p udp -m udp --dport 41641 -j ACCEPT
+
+## nft list ruleset (tables only)
+table ip filter
+table ip nat
+table ip6 filter
+table ip6 nat
+table ip mangle
+table ip6 mangle
+
+## listening sockets
+0.0.0.0:22
+0.0.0.0:443
+0.0.0.0:80
+100.83.106.39:65469
+127.0.0.1:3306
+127.0.0.1:33060
+127.0.0.53%lo:53
+127.0.0.54:53
+[::]:22
+[::]:443
+[::]:80
+[fd7a:115c:a1e0::f53b:6a28]:63668
