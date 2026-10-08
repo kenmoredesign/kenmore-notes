@@ -269,6 +269,43 @@ in the log and is worth knowing for repeat enquirers.
 
 **Closed 2026-10-08 12:17 UTC.** The catch-all block now returns 444 (one edit in `000-default`, backup in `/root/nginx-backup-20261008/`). Verified by public IP on v4 and v6: `wp-config.php`, `dev.zip` and a real `_backups` zip get no reply; live, dev, a demo and 2sto still load. Credential rotation is still open. `claude` was added to `adm`, so nginx logs are now readable.
 
+### 14-day comparison of form POSTs against SendPulse errors (live, 24 Sep to 8 Oct)
+
+Source: nginx `access.log` and `error.log`, readable since `claude` joined `adm`. The log does
+not record the POST body, so form submissions were identified by response size: the success
+message is 261 bytes, 205 gzipped, 216 on the wire, and 41 POSTs to `admin-ajax.php` got exactly
+that (216 or 218 bytes).
+
+| | Count, 15 days |
+|---|---|
+| POSTs to `admin-ajax.php` on live | 1,288 |
+| of which Action Scheduler loopbacks from the server itself (kenmore-translate queue) | 920 |
+| of which WP Rocket front-end beacons and wp-admin traffic | about 190 |
+| of which bots: 301 (wrong host), 400 (no action), 403 | 144 |
+| **Form submissions answered with the success message** | **41**, from 34 IPs, about 2.7 a day |
+| Form submissions dropped by the honeypot or timer | 2 |
+| `SendPulse …` errors in the error log | **0** |
+| PHP fatals on `admin-ajax.php` | 0 |
+| 499 (visitor's browser gave up before the reply) on a form page | 2 (7 Oct 11:06 from `/contact-us/`, 2 Oct 02:03 from a blog post) |
+| 502 | 1 (1 Oct, no referring page) |
+
+Reading: PHP messages do reach that error log (80,507 in the window), and the handler logs
+every token, API and create-contact failure there, so **no SendPulse call failed for these 41
+submissions**. Loss at this step in the last 15 days is at most the two 499s, whose outcome is
+unknown. What this cannot show is a contact that SendPulse accepted but stored incompletely;
+the test leads and fix 1 cover that.
+
+Where the 41 came from: an Arabic blog post on funded-account challenges (7), `/contact-us/` (5),
+home (3), `/zh/contact-us/` (2), the brokerage business-plan page (2), `/prop-firm-solutions/` (2),
+`/ar/` (2), the rest one each. Devices: 18 phone (14 Android, 4 iPhone), 23 desktop.
+
+Also in the log: **295 GET requests with `firstname=` in the URL** in the same 15 days, up to 76
+in a day. With the September bug fixed these are bots that submit the form without running
+JavaScript; they reach nobody. They do put whatever the bot typed into URLs.
+
+dev received 3 success-sized submissions in the window, all from Meta's crawler range
+(`2a03:2880::/32`). They went into the live CRM.
+
 ## Re-running the tests
 
 Scripts are in this directory; see `README.md`. Results and screenshots go to `out/` (not in git).

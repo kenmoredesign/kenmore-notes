@@ -1,0 +1,259 @@
+# kd-site: web-root exposure, 2026-10-08
+
+Read-only follow-up after the port-80 catch-all was closed at 12:17 UTC (see `kd-site.md`).
+Names and paths only; no file contents or values were read or downloaded. HTTP checks were
+HEAD requests.
+
+## Still open (found during this check)
+
+Sensitive files are also served by **named** vhosts, which the catch-all fix does not touch:
+
+| URL | What it is | Status now | Seen in logs |
+|---|---|---|---|
+| `https://2sto.net/site.zip` | 45.6 M zip of the 2sto site, contains `site/wp-config.php` | **200** | **Downloaded 6 times** (full 47,847,936 bytes) |
+| `https://executive.kenmorefx.com/site.zip` | 45.6 M, contains `site/wp-config.php` | **200** | no 200 in 15 days |
+| `https://success.kenmorefx.com/successnew.zip` | 38.9 M, contains `wp-config.php` | **200** | no 200 in 15 days |
+| `https://2sto.net/error_log`, `executive…/error_log`, `victory…/error_log` (5.1 M) | PHP error logs | **200** | not checked |
+| `https://www.kenmoredesign.com/wp-content/themes/sage/resources/assets/kenmore/.git/config` and `/HEAD` | git metadata of the theme assets repo (same under `kenmore/kenmore/`, and on dev, dev2) | **200** | 2 × 200, both my own HEADs |
+| `https://dev.kenmoredesign.com/Forex-CRM-Setup-1.0.0.exe.zip` | duplicate installer, served on purpose on live only | 200 | not sensitive |
+
+The six `2sto.net/site.zip` downloads:
+
+| Date (UTC) | Source IP | Bytes |
+|---|---|---|
+| 2026-09-26 12:25:54 | 195.178.110.131 | 47,847,936 |
+| 2026-09-26 13:31:22 | 93.123.109.55 | 47,847,936 |
+| 2026-09-30 09:10:30 | 195.178.110.15 | 47,847,936 |
+| 2026-10-02 15:38:29 | 149.88.76.100 | 47,847,936 |
+| 2026-10-02 20:45:55 | 195.178.110.15 | 47,847,936 |
+| 2026-10-04 11:05:09 | 93.123.109.55 | 47,847,936 |
+
+That zip is dated 2026-06-16; whether its `wp-config.php` still matches 2sto's current database
+password was not checked. Scanners probe the demo hosts daily for `/database.sql`, `/backup.zip`,
+`/dump.sql` and similar (all 404), so guessable archive names in a docroot do get found.
+
+## 1. Who used the catch-all
+
+**The logs go back to 2026-09-24 00:00 UTC only** (14 rotations, 507,914 lines in the shared
+`access.log`, which holds the catch-all and kenmoredesign.com). How long the catch-all existed
+before that is unknown, and nothing earlier can be checked on this host.
+
+Method: the access log has no Host field, so catch-all hits were identified by path. Only the
+catch-all had `/var/www/html` as root, so only it could answer for `/kdsites/…`,
+`/kdtemplates/…`, `/clientsites/…`, `/webdesign/…`, `/ninjacharge/…`, `/aafx-calculators/…`
+or `/php-sql-test/…`.
+
+28 such requests in 15 days, all of them today. Every 200/206, with nothing excluded:
+
+| Time (UTC) | Source IP | Request | Status | Bytes | Who |
+|---|---|---|---|---|---|
+| 11:43:50 to 12:09:43 | 188.245.16.25, 2a01:4f8:1c16:dcc1::1 | HEAD `wp-config.php` ×4, `dev.zip` ×2, `debug.log`, `readme.txt` | 200 | 0 | Ops box (me) |
+| **12:01:10** | **35.170.74.146** | **GET `/kdsites/site/wp-config.php`** | **206** | **3731 (the whole file)** | `Slackbot-LinkExpanding 1.0` |
+| 12:01:38 | 84.255.31.238 | HEAD `/kdsites/site/wp-config.php` | 200 | 0 | `curl/8.7.1`, taken to be the owner's check |
+
+Also 12:01, from 35.172.165.90: one range request answered 416 with no content.
+
+So, apart from the Ops box and the owner's check: **one transfer of the live `wp-config.php`, to
+Slack's link-preview fetcher**, which fetches a URL when it is posted in a Slack message. No
+`.zip`, `.sql`, `.env` or `_backups/` path was served to anyone in the window. No third-party
+scanner requested a catch-all path in 15 days.
+
+## 2. What was reachable under `/var/www/html`
+
+**Config files with secrets.** Constant names only.
+
+| Files | Secret-bearing names |
+|---|---|
+| `kdsites/site/wp-config.php`, `kdsites/dev2/wp-config.php` | `DB_PASSWORD`, the 8 keys and salts (`AUTH_KEY`, `SECURE_AUTH_KEY`, `LOGGED_IN_KEY`, `NONCE_KEY`, `AUTH_SALT`, `SECURE_AUTH_SALT`, `LOGGED_IN_SALT`, `NONCE_SALT`), `SENDPULSE_CLIENT_ID`, `SENDPULSE_CLIENT_SECRET`, `SENDPULSE_RESPONSIBLE_ID` |
+| `kdsites/dev/wp-config.php` | the same, plus `DUPLICATOR_AUTH_KEY` |
+| `kdtemplates/{meridianfx, broker2-5/site, prop1-5/site, premium/site}/wp-config.php`, `kdtemplates/premium/_staging/premiumfx-files-20260731/server-config/wp-config-template.php` | `DB_PASSWORD`, the 8 keys and salts, `WP_CACHE_KEY_SALT` |
+| `kdtemplates/{breeze, corporate, executive, modern, progress, victory}/{site,site_old}/wp-config.php`, `kdtemplates/{prestige, success}/site/wp-config.php`, `kdtemplates/victory/site/wp-config-back.php`, `clientsites/2sto/{site,site_old}/wp-config.php`, `ninjacharge/old/wp-config.php`, `webdesign/chass/{site,site_old}/wp-config.php`, `webdesign/gea/site/wp-config.php` | `DB_PASSWORD`, the 8 keys and salts |
+| `ninjacharge/public_html/config.php`, `ninjacharge/git/php/config.php` | a `$config` array (not WordPress) |
+| `kdtemplates/modern/{site,site_old}/wp-content/themes/mexin-wp/inc/twitter/config.php` | a `$TConfig` array (Twitter API settings by its name) |
+| `kdtemplates/.htpasswd`, `ninjacharge/old/.htpasswd` | password hashes |
+
+37 `wp-config` files in all. `kdsites` site, dev and dev2 share one MySQL user (`KenmoreSAGE`,
+all privileges on `kenmore_sage`, `kenmore_dev`, `kenmore_dev2`), so one password covers all three.
+The DeepSeek key for kenmore-translate lives in the database, not in a file; it is inside every
+database dump listed below.
+
+No `.env` file exists anywhere under `/var/www/html`.
+
+**`.git` directories:** `ninjacharge/git/.git`, and in each of `kdsites/{site,dev,dev2}`:
+`wp-content/themes/sage/resources/assets/kenmore/.git` and `…/kenmore/kenmore/.git`.
+
+**Database dumps, loose:** `kdtemplates/premium/_staging/premiumfx-db/import.sql` and
+`premiumfx_wp.sql` (3.7 M each), `kdtemplates/premium/_backups/kd_premium-pre-searchreplace-20260731.sql.gz`,
+`webdesign/chass/chass_db.sql` (2016), and six UpdraftPlus `…-db.gz` files (two in each of
+`kdsites/{site,dev,dev2}/wp-content/updraft/`, Dec 2025 and Feb 2026; names carry a random token).
+
+**Logs:** `wp-content/debug.log` in `kdsites/{site,dev,dev2}`; `error_log` in
+`clientsites/2sto/site`, `kdtemplates/{executive,success,victory}/site`.
+
+**Other files to look at** (names only, not opened): `ninjacharge/old/se.php` (29 K, a database
+search-and-replace tool by its name), and two PHP files inside image galleries,
+`webdesign/chass/site_old/wp-content/gallery/distributors/thumbs/config.php` and
+`…/gallery/manufacturer-positions/thumbs/db.php`. PHP in an upload folder is a common sign of
+an old compromise. `/var/www/html/aafx-calculators/` is mode 777.
+
+**Archives** (plugin-bundled and theme-bundled zips left out):
+
+| Size | Date | Path |
+|---|---|---|
+| 66.0 M | 2026-06-16 | `clientsites/2sto/site_old/exec.zip` |
+| 45.6 M | 2026-06-16 | `clientsites/2sto/site/site.zip` |
+| 142.9 M | 2026-07-31 | `clientsites/2sto/site/wp-content/backups-dup-lite/20260731_2stolimited_3fa84396fedf55911045_20260731110640_archive.zip` |
+| 0.1 M | 2026-07-31 | `clientsites/2sto/site/wp-content/backups-dup-lite/20260731_2stolimited_3fa84396fedf55911045_20260731110640_installer.php.bak` |
+| 0.0 M | 2026-06-16 | `clientsites/2sto/site/wp-content/themes/executivefx.zip` |
+| 117.7 M | 2026-06-16 | `clientsites/2sto/site.zip` |
+| 546.7 M | 2026-07-31 | `clientsites/2sto.zip` |
+| 2572.0 M | 2026-06-18 | `kdsites/_backups/live-restorepoint-2026-06-18_111957.zip` |
+| 2609.0 M | 2026-06-19 | `kdsites/_backups/live-restorepoint-2026-06-19_120502.zip` |
+| 2611.7 M | 2026-07-02 | `kdsites/_backups/live-restorepoint-2026-07-02_144349.zip` |
+| 2644.0 M | 2026-07-20 | `kdsites/_backups/live-restorepoint-2026-07-20_143138.zip` |
+| 2632.9 M | 2026-08-12 | `kdsites/_backups/live-restorepoint-2026-08-12_073311.zip` |
+| 2643.2 M | 2026-08-25 | `kdsites/_backups/live-restorepoint-2026-08-25_122443.zip` |
+| 2654.3 M | 2026-09-10 | `kdsites/_backups/live-restorepoint-2026-09-10_152620.zip` |
+| 2522.4 M | 2026-09-25 | `kdsites/_backups/live-restorepoint-2026-09-25_132116.zip` |
+| 101.0 M | 2025-11-07 | `kdsites/dev2/Forex-CRM-1.0.0-arm64-mac.zip` |
+| 762.8 M | 2025-11-07 | `kdsites/dev2/Forex-CRM-Setup-1.0.0.exe.zip` |
+| 14.7 M | 2026-05-19 | `kdsites/dev2/wp-content/backups-dup-lite/19052026_kenmoredesign_8f5528cabc1541ef9570_20260519131152_archive.daf` |
+| 0.1 M | 2026-05-19 | `kdsites/dev2/wp-content/backups-dup-lite/19052026_kenmoredesign_8f5528cabc1541ef9570_20260519131152_installer.php.bak` |
+| 0.2 M | 2026-05-20 | `kdsites/dev2/wp-content/kenmore-translate.zip` |
+| 3.5 M | 2025-12-26 | `kdsites/dev2/wp-content/themes/sage/resources/assets/kenmore.zip` |
+| 25.2 M | 2025-12-26 | `kdsites/dev2/wp-content/themes/sage.zip` |
+| 8.4 M | 2025-12-26 | `kdsites/dev2/wp-content/updraft/backup_2025-12-18-0702_Kenmore_Design_85bf16e59ed0-db.gz` |
+| 0.0 M | 2025-12-26 | `kdsites/dev2/wp-content/updraft/backup_2025-12-18-0702_Kenmore_Design_85bf16e59ed0-mu-plugins.zip` |
+| 159.8 M | 2025-12-26 | `kdsites/dev2/wp-content/updraft/backup_2025-12-18-0702_Kenmore_Design_85bf16e59ed0-others.zip` |
+| 57.0 M | 2025-12-26 | `kdsites/dev2/wp-content/updraft/backup_2025-12-18-0702_Kenmore_Design_85bf16e59ed0-plugins.zip` |
+| 64.3 M | 2025-12-26 | `kdsites/dev2/wp-content/updraft/backup_2025-12-18-0702_Kenmore_Design_85bf16e59ed0-themes.zip` |
+| 158.0 M | 2025-12-26 | `kdsites/dev2/wp-content/updraft/backup_2025-12-18-0702_Kenmore_Design_85bf16e59ed0-uploads.zip` |
+| 9.0 M | 2026-02-03 | `kdsites/dev2/wp-content/updraft/backup_2026-02-03-1509_Kenmore_Design_c449c8ed9a6f-db.gz` |
+| 0.0 M | 2026-02-03 | `kdsites/dev2/wp-content/updraft/backup_2026-02-03-1509_Kenmore_Design_c449c8ed9a6f-mu-plugins.zip` |
+| 160.2 M | 2026-02-03 | `kdsites/dev2/wp-content/updraft/backup_2026-02-03-1509_Kenmore_Design_c449c8ed9a6f-others.zip` |
+| 58.5 M | 2026-02-03 | `kdsites/dev2/wp-content/updraft/backup_2026-02-03-1509_Kenmore_Design_c449c8ed9a6f-plugins.zip` |
+| 64.3 M | 2026-02-03 | `kdsites/dev2/wp-content/updraft/backup_2026-02-03-1509_Kenmore_Design_c449c8ed9a6f-themes.zip` |
+| 268.7 M | 2026-02-03 | `kdsites/dev2/wp-content/updraft/backup_2026-02-03-1509_Kenmore_Design_c449c8ed9a6f-uploads.zip` |
+| 116.2 M | 2025-12-26 | `kdsites/dev2/wp-content/wp-content-kd.zip` |
+| 101.0 M | 2025-11-07 | `kdsites/dev/Forex-CRM-1.0.0-arm64-mac.zip` |
+| 762.8 M | 2025-11-07 | `kdsites/dev/Forex-CRM-Setup-1.0.0.exe.zip` |
+| 3.5 M | 2025-12-26 | `kdsites/dev/wp-content/themes/sage/resources/assets/kenmore.zip` |
+| 8.4 M | 2025-12-26 | `kdsites/dev/wp-content/updraft/backup_2025-12-18-0702_Kenmore_Design_85bf16e59ed0-db.gz` |
+| 0.0 M | 2025-12-26 | `kdsites/dev/wp-content/updraft/backup_2025-12-18-0702_Kenmore_Design_85bf16e59ed0-mu-plugins.zip` |
+| 159.8 M | 2025-12-26 | `kdsites/dev/wp-content/updraft/backup_2025-12-18-0702_Kenmore_Design_85bf16e59ed0-others.zip` |
+| 57.0 M | 2025-12-26 | `kdsites/dev/wp-content/updraft/backup_2025-12-18-0702_Kenmore_Design_85bf16e59ed0-plugins.zip` |
+| 64.3 M | 2025-12-26 | `kdsites/dev/wp-content/updraft/backup_2025-12-18-0702_Kenmore_Design_85bf16e59ed0-themes.zip` |
+| 158.0 M | 2025-12-26 | `kdsites/dev/wp-content/updraft/backup_2025-12-18-0702_Kenmore_Design_85bf16e59ed0-uploads.zip` |
+| 9.0 M | 2026-02-03 | `kdsites/dev/wp-content/updraft/backup_2026-02-03-1509_Kenmore_Design_c449c8ed9a6f-db.gz` |
+| 0.0 M | 2026-02-03 | `kdsites/dev/wp-content/updraft/backup_2026-02-03-1509_Kenmore_Design_c449c8ed9a6f-mu-plugins.zip` |
+| 160.2 M | 2026-02-03 | `kdsites/dev/wp-content/updraft/backup_2026-02-03-1509_Kenmore_Design_c449c8ed9a6f-others.zip` |
+| 58.5 M | 2026-02-03 | `kdsites/dev/wp-content/updraft/backup_2026-02-03-1509_Kenmore_Design_c449c8ed9a6f-plugins.zip` |
+| 64.3 M | 2026-02-03 | `kdsites/dev/wp-content/updraft/backup_2026-02-03-1509_Kenmore_Design_c449c8ed9a6f-themes.zip` |
+| 268.7 M | 2026-02-03 | `kdsites/dev/wp-content/updraft/backup_2026-02-03-1509_Kenmore_Design_c449c8ed9a6f-uploads.zip` |
+| 2715.0 M | 2026-07-20 | `kdsites/dev.zip` |
+| 101.0 M | 2025-11-07 | `kdsites/site/Forex-CRM-1.0.0-arm64-mac.zip` |
+| 762.8 M | 2025-11-07 | `kdsites/site/Forex-CRM-Setup-1.0.0.exe.zip` |
+| 3.5 M | 2025-12-26 | `kdsites/site/wp-content/themes/sage/resources/assets/kenmore.zip` |
+| 8.4 M | 2025-12-26 | `kdsites/site/wp-content/updraft/backup_2025-12-18-0702_Kenmore_Design_85bf16e59ed0-db.gz` |
+| 0.0 M | 2025-12-26 | `kdsites/site/wp-content/updraft/backup_2025-12-18-0702_Kenmore_Design_85bf16e59ed0-mu-plugins.zip` |
+| 159.8 M | 2025-12-26 | `kdsites/site/wp-content/updraft/backup_2025-12-18-0702_Kenmore_Design_85bf16e59ed0-others.zip` |
+| 57.0 M | 2025-12-26 | `kdsites/site/wp-content/updraft/backup_2025-12-18-0702_Kenmore_Design_85bf16e59ed0-plugins.zip` |
+| 64.3 M | 2025-12-26 | `kdsites/site/wp-content/updraft/backup_2025-12-18-0702_Kenmore_Design_85bf16e59ed0-themes.zip` |
+| 158.0 M | 2025-12-26 | `kdsites/site/wp-content/updraft/backup_2025-12-18-0702_Kenmore_Design_85bf16e59ed0-uploads.zip` |
+| 9.0 M | 2026-02-03 | `kdsites/site/wp-content/updraft/backup_2026-02-03-1509_Kenmore_Design_c449c8ed9a6f-db.gz` |
+| 0.0 M | 2026-02-03 | `kdsites/site/wp-content/updraft/backup_2026-02-03-1509_Kenmore_Design_c449c8ed9a6f-mu-plugins.zip` |
+| 160.2 M | 2026-02-03 | `kdsites/site/wp-content/updraft/backup_2026-02-03-1509_Kenmore_Design_c449c8ed9a6f-others.zip` |
+| 58.5 M | 2026-02-03 | `kdsites/site/wp-content/updraft/backup_2026-02-03-1509_Kenmore_Design_c449c8ed9a6f-plugins.zip` |
+| 64.3 M | 2026-02-03 | `kdsites/site/wp-content/updraft/backup_2026-02-03-1509_Kenmore_Design_c449c8ed9a6f-themes.zip` |
+| 268.7 M | 2026-02-03 | `kdsites/site/wp-content/updraft/backup_2026-02-03-1509_Kenmore_Design_c449c8ed9a6f-uploads.zip` |
+| 11.6 M | 2020-03-20 | `kdtemplates/breeze/site_old/breeze.zip` |
+| 0.3 M | 2026-08-21 | `kdtemplates/broker4/site/wp-content/themes/itsulu/inc/plugins/envato-market.zip` |
+| 66.0 M | 2019-11-11 | `kdtemplates/executive/site_old/exec.zip` |
+| 45.6 M | 2023-11-09 | `kdtemplates/executive/site/site.zip` |
+| 0.0 M | 2025-04-10 | `kdtemplates/executive/site/wp-content/themes/executivefx.zip` |
+| 117.7 M | 2026-06-11 | `kdtemplates/executive/site.zip` |
+| 0.4 M | 2026-07-31 | `kdtemplates/premium/_backups/kd_premium-pre-searchreplace-20260731.sql.gz` |
+| 0.4 M | 2026-07-31 | `kdtemplates/premium/premiumfx-db-20260731.zip` |
+| 59.9 M | 2026-07-31 | `kdtemplates/premium/premiumfx-files-20260731.zip` |
+| 44.0 M | 2026-07-31 | `kdtemplates/premium/premiumfx-source-20260731.zip` |
+| 3.5 M | 2026-07-31 | `kdtemplates/premium/_staging/premiumfx-db/import.sql` |
+| 3.5 M | 2026-07-31 | `kdtemplates/premium/_staging/premiumfx-db/premiumfx_wp.sql` |
+| 30.0 M | 2026-07-31 | `kdtemplates/premium/_staging/wordpress-7.0.2.zip` |
+| 0.3 M | 2026-08-21 | `kdtemplates/prop4/site/wp-content/themes/itsulu/inc/plugins/envato-market.zip` |
+| 38.9 M | 2023-08-12 | `kdtemplates/success/site/successnew.zip` |
+| 0.0 M | 2025-12-12 | `kdtemplates/victory/site_old/wp-content/themes/victory.zip` |
+| 0.0 M | 2025-12-12 | `kdtemplates/victory/site/wp-content/themes/victory.zip` |
+| 22.9 M | 2014-10-21 | `ninjacharge/old/flighttomalta.zip` |
+| 0.2 M | 2020-03-27 | `webdesign/centralcleaners/centralcleaners.zip` |
+| 1.2 M | 2016-01-06 | `webdesign/chass/chass_db.sql` |
+| 46.5 M | 2016-01-06 | `webdesign/chass/chass.zip` |
+| 18.1 M | 2016-01-06 | `webdesign/chass/site/post-restore.zip` |
+| 36.1 M | 2025-11-12 | `webdesign/chass/site.zip` |
+| 6.6 M | 2016-01-06 | `webdesign/chass/wordpress-4.2.zip` |
+| 9.1 M | 2018-08-02 | `webdesign/gea/latest.zip` |
+| 0.0 M | 2018-01-10 | `webdesign/gea/original/wp-content/uploads/bcgea.com_.zip` |
+| 0.1 M | 2012-07-18 | `webdesign/gea/original/wp-content/uploads/facebook-social-widgets.1.0.1.zip` |
+| 0.0 M | 2018-01-10 | `webdesign/gea/site/wp-content/uploads/bcgea.com_.zip` |
+| 0.1 M | 2012-07-18 | `webdesign/gea/site/wp-content/uploads/facebook-social-widgets.1.0.1.zip` |
+| 102.7 M | 2018-08-06 | `webdesign/gea/site/wp-content.zip` |
+
+## 3. Do the zips contain a database dump
+
+Listed with `unzip -l`, nothing extracted.
+
+- **All eight `_backups/live-restorepoint-*.zip`: yes.** Each holds a full dump of the live
+  database, `_restore_db_<stamp>.sql`, from 86 M (June 18) to 271 M (Sept 25) uncompressed, plus
+  the live `wp-config.php` and the two UpdraftPlus `-db.gz` files. The files are `root:root 644`.
+  Directory listing was off and the names carry a to-the-second timestamp, so they could not be
+  found by guessing a date alone; the logs show no request for any of them.
+- **`dev.zip`: no loose `.sql`,** but it holds `dev/wp-config.php` (the April version) and the
+  same two UpdraftPlus `-db.gz` database backups (8.8 M and 9.5 M), so it does contain database
+  content from Dec 2025 and Feb 2026.
+
+## 4. Who else uses the SendPulse client ID and secret
+
+On kd-site, only the company site trio:
+
+- `kdsites/{site,dev,dev2}/wp-config.php` define them; all three hold the **same** values
+  (hash comparison: dev = live, dev2 = live).
+- `kdsites/{site,dev,dev2}/wp-content/themes/sage/app/actions.php` is the only code that reads them.
+- Old copies sit inside `dev.zip` and all eight restore-point zips.
+
+Nothing else: no other site tree, no file under `/srv`, `/usr/local`, `/etc/cron*`,
+`/etc/systemd/system`, `/opt` or the readable home directories mentions SendPulse, and none of
+the 23 WordPress databases has a SendPulse option. wp-eu, wp-asia and the Ops repos: no reference.
+
+Not checkable from here: other users' crontabs and the homes of toby, grisha and denisb on
+kd-site, and anything off these servers that was given the same pair (automations, another
+developer's machine, a no-code tool).
+
+After regenerating: update the three `wp-config.php` files. The cached token expires by itself
+within 55 minutes, or delete the `sendpulse_access_token` transient to switch at once.
+
+## 5. wp-eu and wp-asia
+
+Neither has the pattern.
+
+| | Default block | By IP, port 80 | By IP, port 443 |
+|---|---|---|---|
+| wp-eu (91.99.203.165, 2a01:4f8:c0c:644d::1) | port 80 `default_server` serves only `/.well-known/acme-challenge/` from `/var/www/letsencrypt` and returns a fixed 404 page for everything else; port 443 `default_server` has `ssl_reject_handshake on` | 404 for `/`, `/wp-config.php`, `/alverix/public/wp-config.php`, `/zentro/public/wp-config.php`, `/alverix/backups/`; same over IPv6 | handshake refused |
+| wp-asia (5.223.49.177, 2a01:4ff:2f0:3566::1) | one `default_server` for 80 and 443, root `/var/www/default` (holds only `404.html`), `location / { return 404; }` | 404 for `/`, `/wp-config.php`, both sites' `public/wp-config.php`; same over IPv6 | 404 |
+
+## 6. Where dev.zip and the restore points should live
+
+Proposal only; nothing moved or deleted.
+
+- **Restore points:** `/var/backups/kenmore-ops/kdsites/`, owned `root:root`, mode `700`, files
+  `600`. It is on the same filesystem, so moving 21 G is a rename and needs no free space. Change
+  one line in `migrate-dev-to-live.sh`: `BACKUP_DIR="$BASE/_backups"` becomes
+  `BACKUP_DIR=/var/backups/kenmore-ops/kdsites`. The script runs as root, so nothing else changes.
+  Its comment says the directory is "kept OUTSIDE the WP roots"; it was outside the WordPress
+  roots but inside the web root.
+- **`dev.zip`** (2.7 G, 2026-07-20): it is a stale copy of dev with an old `wp-config.php` and
+  database backups. Delete it if nobody needs it; otherwise move it to the same directory.
+- **Same treatment** for the other site-root archives in the table above, starting with the three
+  that are public today (`2sto/site/site.zip`, `executive/site/site.zip`, `success/site/successnew.zip`).
+- The disk is at 76% (18 G free). Eight restore points at 2.6 G each is the largest item; keeping
+  four would free about 10 G.
+- Whatever stays under `/var/www/html` should be covered by a deny rule in **every** vhost, not
+  only kenmoredesign.com: archives, `.sql`, logs, `error_log`, and dot-directories such as `.git`.

@@ -7,6 +7,7 @@
 //   --send       really submit. Dev only (lib.js refuses any other host). Every submission
 //                is labelled TEST and uses --email (required). dev's SendPulse credentials
 //                are the same as live's (checked 2026-10-08), so these land in the live CRM.
+//                '{n}' in --email becomes 01, 02, ... so each lead has its own address.
 //                Writes sent.csv, the list to delete from the CRM afterwards.
 //   --plan       run the fixed 26-lead plan (PLAN below) instead of the full matrix:
 //                one baseline per language, then the edge inputs incl. free-text websites.
@@ -164,7 +165,8 @@ async function layout(page, form) {
           row.opened = how;
           if (form) {
             if (name === 'empty submit') row.layout = await layout(page, form);
-            const data = over && { ...BASE, ...over, ...(send ? { email } : {}), ...(send && !over.message ? { message: `${BASE.message} [${vp}/${lang}/${pg}/${name}]` } : {}) };
+            const n = String(results.length + 1).padStart(2, '0'); // --email 'name+{n}@domain' numbers each lead
+            const data = over && { ...BASE, ...over, ...(send ? { email: email.replace('{n}', n) } : {}), ...(send && !over.message ? { message: `${BASE.message} [${vp}/${lang}/${pg}/${name}]` } : {}) };
             if (data) { await fill(form, data); row.sentAt = new Date().toISOString(); row.data = data; }
             Object.assign(row, await submit(page, form, sink));
             if (name === 'empty submit' || (over && Object.keys(over).length === 0)) await page.screenshot({ path: path.join(out, `${vp}-${lang}-${pg}-${name.replace(/\W+/g, '_')}.png`) });
