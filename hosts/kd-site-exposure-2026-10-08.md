@@ -466,3 +466,38 @@ Also in the database:
 Method: option, user-meta and post-meta names matched against key, token, secret, password and
 licence patterns, with values tested for being non-empty on the host and never printed. A
 credential stored under an unusual name would be missed.
+
+## 2026-10-09 root window, 13:53 to 13:56 UTC: fix 1 on live, WP File Manager removed
+
+- **Fix 1 on live:** `kdsites/site/wp-content/themes/sage/app/actions.php` replaced with the
+  same file that runs on dev (checked equal by hash before installing). Backups:
+  `/var/backups/kenmore-ops/changes-20261009/live-actions.php.before` and `.after`. Lint clean,
+  owner and mode unchanged, pages and the form endpoint respond, no PHP fatal.
+- **WP File Manager removed** (deactivated, then plugin files deleted) on dev, live, 2sto,
+  executive and victory. Nothing depended on it: no shortcode in published content, no reference
+  from the theme, mu-plugins or other plugins, no request to its admin page in 15 days. Each
+  plugin directory was archived first to
+  `/var/backups/kenmore-ops/changes-20261009/wp-file-manager-<site>.tar.gz`. Home and login
+  pages unchanged on all five.
+  Left behind on each site, harmless without the plugin: the options `fm_key` and
+  `filemanager_email_verified_*`, the table `wp_wpfm_backup`, the folder
+  `wp-content/uploads/wp-file-manager-pro/`, and `.tmb/` (30 thumbnail files on victory).
+  **Still installed and active, not part of this request:** prestige and success, both at 7.2,
+  the oldest version on the host.
+
+## The two .htpasswd files (read-only, 2026-10-09)
+
+| File | Date | Content | Used by |
+|---|---|---|---|
+| `/var/www/html/kdtemplates/.htpasswd` | 2015-10-05 | one entry, user `kdfx`, Apache MD5 (`$apr1$`) hash | nothing |
+| `/var/www/html/ninjacharge/old/.htpasswd` | 2014-09-01 | one entry, user `dev`, Apache MD5 hash | nothing |
+
+Both are leftovers from Apache hosting. nginx has no `auth_basic` or `auth_basic_user_file`
+anywhere, Apache is installed but stopped and disabled, and nginx ignores `.htaccess`. The only
+`.htaccess` that mentions password protection is `ninjacharge/old/.htaccess`, where the lines are
+commented out and point at a path that does not exist (`/var/www/html/salescharge/.htpasswd`).
+So neither file protects anything today, and whatever they once guarded (the templates
+directory, the old ninjacharge site) is not protected by them. Neither directory is a vhost
+root, and the deny snippet blocks dotfiles on every vhost, so they are not reachable over the
+web; they were reachable through the old catch-all until 2026-10-08. Apache MD5 hashes are weak:
+if either password is reused anywhere, treat it as known.
