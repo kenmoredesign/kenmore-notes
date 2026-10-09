@@ -40,7 +40,7 @@ This is the template/demo host ("KenmoreSite"). It serves the Kenmore Design com
 |---|---|---|---|
 | 000-default | `kenmoredesign.com`, `www.kenmoredesign.com` (live company site); `_` catch-all on 80 | `kdsites/site` (catch-all: none, `return 444` since 2026-10-08) | php8.3 `www` |
 | dev | `dev.kenmoredesign.com` | `kdsites/dev` | php8.3 `www` |
-| dev2 | `dev2.kenmoredesign.com` | `kdsites/dev2` | php8.3 `www` |
+| dev2 | `dev2.kenmoredesign.com` | none: switched off 2026-10-09, stub returns 410; files in `/var/backups/kenmore-ops/quarantine/kdsites-dev2`, database `kenmore_dev2` still in MySQL | none |
 | broker1 | `meridianfx.kenmorefx.com` (also `broker1.kenmorefx.com`, `broker1.78.47.190.199.nip.io`, both 301 to meridianfx) | `kdtemplates/meridianfx` (note: no `/site`) | php8.3 `demos` |
 | broker2 | `highpointfx.kenmorefx.com` (+ `broker2.*` redirects) | `kdtemplates/broker2/site` | `demos` |
 | broker3 | `atlasfx.kenmorefx.com` (+ `broker3.*` redirects) | `kdtemplates/broker3/site` | `demos` |

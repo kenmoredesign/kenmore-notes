@@ -1,0 +1,27 @@
+n,sent_at_utc,email,sendpulse_contact_id,log_status,firstname,lastname,company,form,lang,viewport,case
+1,2026-10-09T12:46:53,testeeee+01@kedddd.com,43962776,created,TEST Anna,TEST Probe,TEST Kenmore audit,home,en,desktop,baseline
+2,2026-10-09T12:47:07,testeeee+02@kedddd.com,43962779,created,TEST Anna,TEST Probe,TEST Kenmore audit,contact,fr,mobile,baseline
+3,2026-10-09T12:47:19,testeeee+03@kedddd.com,43962780,created,TEST Anna,TEST Probe,TEST Kenmore audit,pdf,es,desktop,baseline
+4,2026-10-09T12:47:36,testeeee+04@kedddd.com,43962783,created,TEST Anna,TEST Probe,TEST Kenmore audit,home,ru,mobile,baseline
+5,2026-10-09T12:47:50,testeeee+05@kedddd.com,43962791,created,TEST Anna,TEST Probe,TEST Kenmore audit,contact,tr,desktop,baseline
+6,2026-10-09T12:48:02,testeeee+06@kedddd.com,43962796,created,TEST Anna,TEST Probe,TEST Kenmore audit,pdf,zh,mobile,baseline
+7,2026-10-09T12:48:14,testeeee+07@kedddd.com,43962802,created,TEST Anna,TEST Probe,TEST Kenmore audit,home,ja,desktop,baseline
+8,2026-10-09T12:48:26,testeeee+08@kedddd.com,43962808,created,TEST Anna,TEST Probe,TEST Kenmore audit,contact,ko,mobile,baseline
+9,2026-10-09T12:48:40,testeeee+09@kedddd.com,43962813,created,TEST Anna,TEST Probe,TEST Kenmore audit,pdf,ar,desktop,baseline
+10,2026-10-09T12:48:57,testeeee+10@kedddd.com,43962822,created,TEST Anna,TEST Probe,TEST Kenmore audit,home,fa,mobile,baseline
+11,2026-10-09T12:49:09,testeeee+11@kedddd.com,43962828,created,TEST Anna,TEST Probe,TEST Kenmore audit,contact,he,desktop,baseline
+12,2026-10-09T12:49:22,testeeee+12@kedddd.com,43962835,created,TEST Anna,TEST Probe,TEST Kenmore audit,pdf,ku,mobile,baseline
+13,2026-10-09T12:49:33,testeeee+13@kedddd.com,43962840,created,TEST Anna,TEST Probe,TEST Kenmore audit,contact,en,mobile,phone +971 spaced
+14,2026-10-09T12:49:46,testeeee+14@kedddd.com,43962848,created,TEST Anna,TEST Probe,TEST Kenmore audit,contact,ar,desktop,phone 0044 prefix
+15,2026-10-09T12:49:59,testeeee+15@kedddd.com,43962855,created,TEST Anna,TEST Probe,TEST Kenmore audit,contact,zh,mobile,whatsapp +7 dashes
+16,2026-10-09T12:50:10,testeeee+16@kedddd.com,43962864,created,TEST Anna,TEST Probe,TEST Kenmore audit,contact,en,desktop,telegram @handle
+17,2026-10-09T12:50:23,testeeee+17@kedddd.com,43962873,created,TEST محمد,TEST الأحمد,TEST Kenmore audit,contact,ar,mobile,name Arabic
+18,2026-10-09T12:50:35,testeeee+18@kedddd.com,43962876,created,TEST 王,TEST 小明,TEST Kenmore audit,contact,zh,desktop,name Chinese
+19,2026-10-09T12:50:46,testeeee+19@kedddd.com,43962883,created,TEST Алексей,TEST Щербаков,TEST Kenmore audit,contact,en,mobile,name Cyrillic
+20,2026-10-09T12:50:58,testeeee+20@kedddd.com,43962889,created,TEST Seán,TEST O'Brien-Smith,TEST Kenmore audit,contact,ar,desktop,name O'Brien-Smith
+21,2026-10-09T12:51:11,testeeee+21@kedddd.com,43962897,created,TEST Anna,TEST Probe,TEST International Brokerage Holdings an,contact,zh,mobile,company 220 chars
+22,2026-10-09T12:51:22,testeeee+22@kedddd.com,43962904,created,TEST Anna,TEST Probe,TEST Kenmore audit,contact,en,desktop,website bare domain
+23,2026-10-09T12:51:34,testeeee+23@kedddd.com,43962909,created,TEST Anna,TEST Probe,TEST Kenmore audit,contact,ar,mobile,website free text
+24,2026-10-09T12:51:46,testeeee+24@kedddd.com,43962914,created,TEST Anna,TEST Probe,TEST Kenmore audit,contact,zh,desktop,website www no scheme
+25,2026-10-09T12:51:58,testeeee+25@kedddd.com,43962918,created,TEST Anna,TEST Probe,TEST Kenmore audit,contact,en,mobile,website full URL
+26,2026-10-09T12:52:10,testeeee+26@kedddd.com,43962924,created,TEST Anna,TEST Probe,TEST Kenmore audit,contact,ar,desktop,website with spaces

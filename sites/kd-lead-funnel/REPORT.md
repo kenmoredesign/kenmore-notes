@@ -306,6 +306,46 @@ JavaScript; they reach nobody. They do put whatever the bot typed into URLs.
 dev received 3 success-sized submissions in the window, all from Meta's crawler range
 (`2a03:2880::/32`). They went into the live CRM.
 
+## Update 2026-10-09: fix 1 on dev, 26 TEST leads
+
+**Fix 1 is on dev** (not on live). `themes/sage/app/actions.php` on dev was replaced with the
+patched version in a root window at 12:45 UTC; backups before and after are in
+`/var/backups/kenmore-ops/changes-20261009/` on kd-site (`dev-actions.php.before`, `.after`).
+Live's file is unchanged. A dev-to-live migration would carry the patched file to live, so run
+none until fix 1 is approved for live or the file is put back.
+
+**26 TEST leads sent from dev, 12:46 to 12:52 UTC,** with dev on the new SendPulse pair.
+`test-leads-2026-10-09.csv` is the deletion list: number, time, address
+(`testeeee+01@kedddd.com` to `+26`), SendPulse contact id, name, company, form, language, case.
+
+What dev's submission log (`leadlog_kenmore_dev`) recorded:
+
+| | |
+|---|---|
+| Rows | 26, one per lead |
+| Status | `created` for all 26; no `failed`, no `created_partial`, none stuck at `received` |
+| SendPulse contact id | present on every row (43962776 to 43962924) |
+| SendPulse error text | empty on every row; no `SendPulse` line in dev's PHP log |
+| Source IP, country at submit time | `2a01:4f8:1c16:dcc1::1` (the Ops box, IPv6), `DE` |
+| Stored fields | all 18 posted fields, non-Latin names and the 220-character company intact |
+
+So every case was accepted by the API, including the ones suspected of being rejected: website
+as a bare domain, `www.` without scheme, a full URL, "none yet", free text with spaces; phones
+with spaces, `00` prefix; WhatsApp and Telegram handles; Arabic, Chinese, Cyrillic names;
+`O'Brien-Smith`. The link-type attribute did not cause a rejection. **Accepted is not the same
+as stored correctly:** whether the website, phone and messenger values and the apostrophe look
+right on each contact can only be seen in the SendPulse UI. Lead 20 (`O'Brien-Smith`) is the one
+to look at: the handler sends form values to SendPulse without removing the backslash
+WordPress adds before an apostrophe.
+
+Geo, for the comparison with the Ops box: the leads went out over IPv6 from
+`2a01:4f8:1c16:dcc1::1` (Hetzner, Germany). `IP Country` should read `DE` on all 26, which
+here is right by coincidence (the page's baked-in value and the real one agree). `IP City` and
+`IP Timezone` come from the ip-api lookup of that address at submit time and are not in the
+log; they should be a Hetzner location and `Europe/Berlin`.
+
+The plan lists 27 cases and sends the first 26; "message multiline + emoji" was the one left out.
+
 ## Re-running the tests
 
 Scripts are in this directory; see `README.md`. Results and screenshots go to `out/` (not in git).

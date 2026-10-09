@@ -409,3 +409,60 @@ far as one test from one address shows.
   `DUPLICATOR_AUTH_KEY`, database passwords.
 - Effects: everyone is logged out of every site; pages cached by WP Rocket before the shuffle
   carry stale content-protector nonces until the cache is cleared or expires (24 h).
+
+## 2026-10-09 root window, 12:44 to 12:46 UTC: dev2 switched off
+
+- `/etc/nginx/sites-available/dev2` replaced by a stub: ports 80 and 443 (IPv4 and IPv6),
+  the existing dev2 certificate, `return 410`. Backup: `/var/backups/kenmore-ops/changes-20261009/nginx-dev2.before`.
+  The stub is needed: with no 443 block of its own the name would be answered by the first 443
+  server block, which is the live site. `nginx -t` passed, reloaded.
+- `/var/www/html/kdsites/dev2` moved to `/var/backups/kenmore-ops/quarantine/kdsites-dev2`
+  (root, 700; 3.4 G), with a manifest entry. Database `kenmore_dev2` left in MySQL.
+- Verified: `https://` and `http://dev2.kenmoredesign.com/` return 410 with no site content;
+  live and dev load; every other hostname has the status it had before.
+- Left as they are: dev2's certbot renewal, its access log, the `sftpjail` chroot in
+  `sshd_config` that points at the old path, and the `dev2` entry in the `wp` wrapper (it now
+  reports that the site is not on the host). The Uptime-Kuma monitor at 89.167.38.140 will now
+  see 410.
+- Same window: fix 1 applied to dev (see the lead-funnel report); on dev, `broken-link-checker`
+  deactivated and WP Rocket preload turned off, both also added to the refresh script.
+
+## Credentials held in live's database (names only, 2026-10-09)
+
+Every database dump contains these: the eight restore points, the UpdraftPlus sets, the dev
+backup of 2026-10-09, and dev's database after each refresh.
+
+| Option | What it is | Plugin still installed |
+|---|---|---|
+| `kt_api_key` | OpenAI API key used by kenmore-translate | yes, active |
+| `leadin_access_token`, `leadin_refresh_token` (with `leadin_portalId`, `leadin_portal_domain`) | HubSpot OAuth tokens for a connected portal | **no**: leftover from a removed HubSpot plugin |
+| `optml_settings` → `api_key`, `cdn_key`, `cdn_secret` | Optimole account and CDN credentials | no: leftover |
+| `termly_api_key` | Termly (consent banner) API key | no: leftover |
+| `googlesitekit_credentials` | Google Site Kit OAuth client credentials, encrypted with the old salts and so unreadable since the shuffle | installed, not active |
+| `wp_rocket_settings` → `consumer_key`, `secret_key`, `consumer_email`, `license` | WP Rocket licence credentials | yes, active |
+| `acf_pro_license` | ACF Pro licence | yes |
+| `robin_image_optimizer_license_data` → `license` | Robin image optimiser licence | yes |
+| `elementor_pro_license_key` | Elementor Pro licence field (9 characters, may be a status word, not a key) | no |
+| `dupli_opt_hash` | Duplicator's internal secret | yes |
+| `fm_key` | WP File Manager key | yes |
+| `passster_secure_key` | content-protector's cookie-signing key | yes |
+| `indexnow-admin_bwt_site_auth_key` | IndexNow key; public by design | n/a |
+
+Also in the database:
+
+- **Content passwords:** 12 `passster_password` post-meta rows (the passwords for protected
+  content, stored as entered) and 108 posts with a WordPress post password.
+- **Users:** 7 password hashes (6 bcrypt, 1 in the old phpass format), 6 session-token rows,
+  1 pending password-reset key. No application passwords.
+- **Duplicator:** 2 `Storage_Entity` rows in `wp_duplicator_entities`; a remote storage would
+  keep its credentials there. Not inspected.
+- **UpdraftPlus:** 15 `updraft_<service>` options exist; none has a non-empty key, secret or
+  token field, so no remote storage looks configured.
+- **Old salts:** `auth_key`, `auth_salt`, `logged_in_key`, `logged_in_salt`, `nonce_key`,
+  `nonce_salt` exist as options with ids 111 to 128, from the day the site was installed.
+  WordPress ignores them because all eight constants in `wp-config.php` are defined and distinct.
+- **Not in the database:** the SendPulse pair and the database password (both `wp-config.php`).
+
+Method: option, user-meta and post-meta names matched against key, token, secret, password and
+licence patterns, with values tested for being non-empty on the host and never printed. A
+credential stored under an unusual name would be missed.
