@@ -132,3 +132,48 @@ It looks abandoned as a work site, but something still watches it.
   today's snippet, no cron entry, same database user and SendPulse constants as live.
 
 Unknown from here: who runs the Uptime-Kuma monitor, and whether anyone still needs dev2.
+
+## Update 2026-10-09: failure handling, restore, excluded folders
+
+**The live export** (`/tmp/live-export-<date>.sql`, a full copy of live's WordPress tables,
+mode 600) is removed when the script ends, however it ends: normal finish, a failed step, or an
+interrupt. The dry run now prints that `rm`.
+
+**If a step fails:**
+
+- before dev's database is cleaned (pre-flight, backup, live export): the script stops, takes
+  dev out of maintenance mode again and says dev was not modified;
+- once dev's database has been cleaned (import, URL rewrite, file sync, dev-only settings): the
+  script stops, leaves dev in maintenance mode, and prints the restore commands with the real
+  file names of that run.
+
+**Restoring dev from a backup zip** (as root; replace `<date>` with the stamp in the zip's name):
+
+```sh
+Z=/var/backups/kenmore-ops/kdsites/dev-backup-<date>.zip
+D=/var/www/html/kdsites/dev
+unzip -p "$Z" "dev-backup-<date>.sql" | sudo -u www-data wp --path="$D" db import - --default-character-set=utf8mb4
+unzip -o -q "$Z" -x "dev-backup-<date>.sql" -d "$D"
+chown -R www-data:www-data "$D"
+sudo -u www-data wp --path="$D" maintenance-mode deactivate
+curl -sI https://dev.kenmoredesign.com/ | head -1
+```
+
+The import replaces every table (the dump drops and recreates each one), and it works on an
+empty database. The unzip puts back every file dev had, including its `wp-config.php`; it does
+not remove files that arrived from live and dev did not have. The zip holds dev's
+`wp-config.php` and database, so it is root-only.
+
+Tested on the Ops box against stub commands (nothing on kd-site was run): a normal run, a
+failure of the live export, of the import and of the URL rewrite. In each case the live export
+was gone afterwards, no write command was issued against live, and dev's maintenance state was
+as described above.
+
+**Live-only folders the first version would have copied to dev,** now excluded together with
+`updraft` (the same 1 GB of December and February UpdraftPlus sets sits on both sides):
+
+| Folder on live | Size | What it is |
+|---|---|---|
+| `wp-content/backups-dup-lite/` | 12 K, 2 files (`.htaccess`, `robots.txt`) | Duplicator's backup folder, empty of backups |
+| `wp-content/wflogs/` | 8 K, 1 file (`.htaccess`) | Wordfence's log folder, not a backup; excluded with it since it is live-only state |
+| `wp-content/plugins/wordfence/` | 76 K, 8 `.htaccess` files in an empty directory skeleton | What is left of a removed Wordfence. **Not excluded**: it is under `plugins/`, and excluding one plugin folder would make dev's plugin tree differ from live's. It is not a working plugin |
