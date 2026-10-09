@@ -23,7 +23,8 @@ is since today's refresh it would remove GTM and Chatwoot from live (section 1).
 | `broken-link-checker` | active | inactive | **Deactivated on live** | Activated again if it was active before |
 | WP Rocket cache preload (`wp_rocket_settings` → `manual_preload`) | 1 | 0 | **Preload switched off on live** | Live keeps its value for this key; every other WP Rocket setting comes from dev |
 | Cached SendPulse token (transient) | live's | dev's | dev's token is used on live for up to 55 minutes. Harmless while both use one account | Deleted on live; live requests its own |
-| `acf_pro_license`, `acf_pro_license_status`, `wp_rocket_last_base_url` (each encodes the site's own URL), `fs_active_plugins` (holds an absolute path) | live's | dev's | dev's copies land on live; the plugins repair them later. Has happened on every deploy | Live keeps its own |
+| `acf_pro_license`, `wp_rocket_last_base_url` (each encodes the site's own URL), `fs_active_plugins` (holds an absolute path) | live's | dev's | dev's copies land on live; the plugins repair them later. Has happened on every deploy | Live keeps its own |
+| `acf_pro_license_status` | live's | dev's | dev's lands on live | Not kept: ACF rewrites it every time WordPress loads (seen on dev: a new value after each load) |
 | Scheduled jobs (`cron`) | 8,043 bytes | 7,142 bytes (no link-checker or preload jobs) | dev's schedule replaces live's | Still dev's; activating the link checker and restoring the preload setting put their jobs back. Will show as a difference in Phase 2 |
 | Users | 6 | 7 | dev's users replace live's | Same, behind the guard (section 4) |
 | Logins | | | dev's session tokens replace live's: everyone is logged out of live's wp-admin | Same |
@@ -91,15 +92,24 @@ bash on stdin.
 | Step | What | Live |
 |---|---|---|
 | 0 | Pre-flight and the guard. Read-only | up |
-| 1 | Live's cron entry renamed to `wp-cron-kdsites.paused` (cron skips names with a dot), wait for a running job to end; zip of live's files to `/var/backups/kenmore-ops/kdsites/live-restorepoint-<date>.zip` | up |
-| 2 | Maintenance flag written by the script (holds until removed, written again before every step). Guard again. Live's `wp_` tables and, as a second file, its other tables dumped by root into the root-only work directory and added to the zip | **down** |
+| 1 | Live's cron entry renamed to `wp-cron-kdsites.paused` (cron skips names with a dot), wait for a running job to end. Zip of live's files to `/var/backups/kenmore-ops/kdsites/live-restorepoint-<date>.zip`; live's `wp_` tables and, as a second file, its other tables dumped by root into the root-only work directory and added to the zip. **Backup checked:** each dump must end with mysqldump's closing line and hold one `CREATE TABLE` per table asked for; the zip must pass `unzip -t` (every entry read back, checksums compared) and list the dump, `wp-config.php` and `index.php` | up |
+| 2 | Maintenance flag written by the script (holds until removed, written again before every step). Guard again | **down** |
 | 3 | Live's own values saved; dev's `wp_` tables exported | down |
 | 4 | Live's `wp_` tables dropped, dev's imported, URLs rewritten in `wp_` tables only | down |
 | 5 | `rsync --delete` dev -> live, every changed file logged | down |
 | 6 | Live's values put back and verified; lead log checksum verified; caches emptied; refresh record updated | down |
 | 7 | Flag removed, cron entry back; home and login status, GTM and Chatwoot looked for in the home page | up |
 
-- **Failure before step 4:** live is put back online unchanged, cron entry back.
+- **Failure before step 4:** live is put back online unchanged.
+- **The cron entry is put back on every exit path** (normal end, any failed step, interrupt),
+  from one cleanup function. After a failure from step 4 on that means WP-cron runs again on a
+  half-deployed live until it is restored; the owner chose that over an entry that stays paused
+  unnoticed. Only a `kill -9` or a power cut can leave it paused, and the next run then refuses
+  to start and names the file. `refresh-dev-from-live.sh` now pauses dev's entry
+  (`wp-cron-kdsites-dev`) the same way.
+- The database dump is taken with live still up (`--single-transaction`), up to about two
+  minutes before the flag. The guard after the flag proves content, users and files did not
+  change in between; a setting changed in wp-admin in that gap would not be in the backup.
 - **Failure from step 4 on:** the script stops, live stays in maintenance mode, and the restore
   commands are printed with that run's file names. The same block is printed after a successful
   run, as the way to undo it. The restore imports the `wp_` tables only, so it never rolls the
@@ -110,15 +120,47 @@ bash on stdin.
   removed when the script ends, however it ends.
 
 Tested on the Ops box against stub commands (nothing on kd-site was run): a refresh followed by
-a deploy, a second deploy with no refresh in between, and 16 failure cases: live changed since
-the refresh (database, files), no record, live already in maintenance mode, failure of the zip,
-of each export, of reading a live value, of the import, of the URL rewrite, of the plugin
-activation, a kept option or key not coming back, the lead log changing, a missing tag, an
-interrupt. In each case live's flag, cron entry and the list of write commands issued were as
-described above. **Not tested anywhere: the SQL of steps 3 and 6 against a real MySQL** (no
-database on the Ops box, and Phase 1 writes nothing on kd-site). The statements are a
-`CREATE TABLE … AS SELECT`, an `UPDATE … JOIN`, an `INSERT … SELECT` and a count. If one fails
-in step 6, live stays in maintenance mode until restored: about 2 more minutes.
+a deploy, a second deploy with no refresh in between, and 18 failure cases: live changed since
+the refresh, no record, live already in maintenance mode, failure of the zip, a truncated dump,
+a dump lacking a table, a zip failing its integrity test, failure of the dev export, of reading
+a live value, of the import, of the URL rewrite, of the plugin activation, a kept option or key
+not coming back, the lead log changing, a missing tag, an interrupt before and a TERM after the
+point of no return. In each case live's flag, both cron entries and the list of write commands
+issued were as described. The refresh was run through five failure cases for its cron entry.
+
+### The save, verify and restore statements on real MySQL (dev's database only, 16:54 UTC)
+
+Run as `claude` through the `wp` wrapper against `kenmore_dev` (MySQL 8.0.46), with a scratch
+option `deploykeep_selftest` holding quotes, a backslash, an emoji and serialized text. Nothing
+on live. Scratch option and table removed afterwards; dev has 939 options as before, home 200.
+
+| Statement | Result |
+|---|---|
+| `DROP TABLE IF EXISTS`, `CREATE TABLE deploykeep_options AS SELECT …` | ok, 6 rows, columns copied with their collation |
+| Verify count straight after the save | 0 |
+| Scratch option changed (value and autoload), verify | counted it |
+| `UPDATE … JOIN` | value and autoload back, verify 0 |
+| Scratch option deleted, verify, then `UPDATE` and `INSERT … SELECT … LEFT JOIN` | counted it; row inserted, verify 0; WordPress reads the original value back byte for byte |
+| `CHECKSUM TABLE leadlog_kenmore_dev`, twice | identical |
+| Table lists | 59 prefixed; others: the lead log (and the keep table, which the script filters out) |
+| Export of the 59 tables | last line `-- Dump completed on …`, 59 `CREATE TABLE` lines |
+| Key save and restore (`option pluck`, `option patch update`, pluck again) | identical for all four keys |
+
+Two faults found by this test, both of which would have stopped a real deploy after the point
+of no return, both fixed:
+
+1. **`wp option patch update` treats a value of `0` on stdin as no value** and fails. Live's
+   preload value is 1, so tomorrow's run would have passed, but any kept key that is 0 on live
+   would have failed. The value is now passed as an argument; tested on dev with 0, an empty
+   string, 1 and a script tag with quotes.
+2. **`acf_pro_license_status` changes every time WordPress loads.** The verify counted it as a
+   kept option that had not come back. It is no longer kept, and the kept options are now
+   verified straight after the restore, before any command that loads WordPress.
+
+Side effect on dev: the `UPDATE` wrote `acf_pro_license_status` back to the value saved seconds
+earlier; ACF has rewritten it on every load since.
+
+Still not run for real: the whole script in order, against live. That is Phase 2.
 
 ## 4. The guard
 
@@ -151,8 +193,9 @@ a refresh in between is not blocked.
 ## 5. Time in maintenance mode
 
 **About 3 minutes.** The 25 Sep run of the old script kept live down for 3 min 37 s: zip 62 s,
-import 26 s, URL rewrite 113 s, file sync 5 s. The new script takes the zip before the flag goes
-up and adds roughly 30 seconds of saving, restoring and verifying. The log states the measured
+import 26 s, URL rewrite 113 s, file sync 5 s. The new script takes the zip, the dump and the
+backup check before the flag goes up and adds roughly 30 seconds of saving, restoring and
+verifying. The log states the measured
 time at the end.
 
 During that time every page and every form submission gets WordPress's 503 page. A lead sent in
