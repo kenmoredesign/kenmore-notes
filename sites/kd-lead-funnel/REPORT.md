@@ -346,6 +346,73 @@ log; they should be a Hetzner location and `Europe/Berlin`.
 
 The plan lists 27 cases and sends the first 26; "message multiline + emoji" was the one left out.
 
+## Status at pause, 2026-10-09
+
+**Fix 1 is live** since 13:53 UTC on 2026-10-09 (same file as dev; backups in
+`/var/backups/kenmore-ops/changes-20261009/` on kd-site). Every form submission on live is now
+written to the table `leadlog_kenmore_sage` before SendPulse is called and updated with the
+result. Read it with:
+
+```sh
+ssh kd-site 'sudo /usr/local/lib/kenmore-ops/wp site db query "SELECT id, created_at, status, sp_contact_id, country, LEFT(sp_error,120) err FROM leadlog_kenmore_sage ORDER BY id DESC LIMIT 50"'
+```
+
+`status` is `created`, `created_partial` (contact made, phone or messenger call failed),
+`failed`, `honeypot`, `too_fast`, or `received` (PHP died before SendPulse answered). Times are UTC.
+The table holds personal data (the posted fields, IP, user agent) and has no retention rule yet.
+
+### What the audit established
+
+- The forms are the theme's own AJAX handler, not Contact Form 7. One handler, six placements
+  per page, twelve languages.
+- Browser side: passes in all 12 languages on all three form types at desktop and phone width.
+- Server to SendPulse: 26 of 26 test leads created from dev, including every edge case; 41 real
+  submissions on live in the 15 days to 8 Oct with no SendPulse error logged. No evidence of
+  ongoing loss. The September loss (forms not posting at all) was a script-order bug, fixed on
+  10 Sep and closed by the owner.
+- Until fix 1 there was no record of a submission anywhere but SendPulse. There still is no
+  second delivery channel: the server cannot send mail.
+- `IP Country`, `First Page Seen` and the referrer on each CRM contact come from cached HTML
+  and belong to whoever caused the page to be cached, not to the lead. City and timezone are right.
+
+### Remaining fixes, ranked
+
+The numbers are the original ones from section 7. Fix 1 is done.
+
+| Rank | Fix | Effort | Why now |
+|---|---|---|---|
+| 1 | **Fix 3: geo and attribution read at submit time.** Take country from `CF-IPCountry` and first page and referrer from the visitor's cookies inside the handler, not from cached HTML | S | Every lead in the CRM carries someone else's country and first page today. The lead log already records the true country per submission, so the fix can be checked against it |
+| 2 | **Fix 4: outcome events.** Push `lead_submit_ok` / `lead_submit_error` to `dataLayer` and PostHog from `actions.js` | S | Makes the funnel measurable and would show a repeat of September the same day |
+| 3 | **Fix 5: self-host jquery.validate and give the form `method="post"`** | S | Removes the single dependency whose failure turns every submit into a GET that reaches nobody. 295 such GETs in 15 days today are bots; under a broken script they would be customers |
+| 4 | **Fix 2: a mail transport for `wp_mail`** (SendPulse SMTP, credentials in `wp-config.php`) | S, needs root | The second copy of each lead. Less urgent now that the lead log exists |
+| 5 | **Show the visitor an error when the contact is not created** (was part of fix 1, left out on purpose) | S | Today a failed lead still gets the success screen. Wait until the log shows how often `failed` happens |
+| 6 | **Fix 6: server-side checks**: email with a TLD, no URL in name fields, set `form_time` in JavaScript so the timer works | S | Quality of what reaches the CRM. Bots that post directly go straight in |
+| 7 | **Fix 7, reduced:** strip the backslash before apostrophes (`wp_unslash`) and keep message line breaks | S | The website-rejection worry is gone (all variants were accepted). What is left is cosmetic damage to names like O'Brien and flattened messages |
+| 8 | **Fix 8: mobile and RTL polish**: phone field `type="tel"`, `autocomplete`, RTL chevron, translate "Messenger", Kurdish label | S | Completion rate on phones, mostly RTL markets |
+| 9 | **Fix 9: logs for the next audit**: nginx format with `CF-IPCountry`, 90-day retention | M, needs root | The 12-month source breakdown is impossible from 14 days of logs |
+| 10 | **Fix 10: remove dead parts**: CF7, form 1828, the Forminator mu-plugin; decide on UTM capture | S | Tidiness; UTM capture would be new work |
+| new | **Lead log housekeeping:** a retention rule (for example delete rows older than 12 months) and a one-line weekly check for `failed` rows | S | The table grows with every bot submission and holds personal data |
+
+Parked until the Ops secrets wrapper exists: comparing the lead log with SendPulse through the
+API, and step 4 (12 months of submissions by country, language, landing page and referrer,
+AI referrers and crawlers) from PostHog.
+
+### HANDBACK
+
+```
+KD lead-funnel audit, paused 2026-10-09. Forms are a custom theme AJAX handler -> SendPulse, not CF7.
+FOUND: no ongoing lead loss. Browser side passes in 12 languages; 26/26 test leads created via dev;
+41 real submissions in 15 days on live with zero SendPulse errors. September loss = JS bug, fixed 10 Sep.
+CHANGED: fix 1 live since 9 Oct 13:53 UTC: every submission logged in table leadlog_kenmore_sage with
+the SendPulse result. dev refreshed from live, analytics tags stripped on dev, dev2 switched off.
+SIDE WORK (kd-site security): raw wp-config exposure closed, salts shuffled on 23 sites, SendPulse pair
+rotated, backups moved out of the web root, deny rules on every vhost, backdoored chass tree quarantined.
+OPEN: CRM country / first page / referrer are wrong on every lead (cached HTML): fix 3 next.
+No outcome events in GTM/PostHog (fix 4). No second delivery channel (no mail transport). No retention
+rule on the lead log. Step 4 (12-month sources, AI referrers) parked until PostHog access via Ops wrapper.
+UNLOCKS: weekly loss number from the lead log; once fix 3 is in, CRM geo and attribution become usable.
+```
+
 ## Re-running the tests
 
 Scripts are in this directory; see `README.md`. Results and screenshots go to `out/` (not in git).
