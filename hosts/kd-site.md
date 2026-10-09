@@ -172,7 +172,7 @@ Empty versions mean no `Version:` header found, not necessarily an empty folder.
 - **ninjacharge**: live root `public_html/web` is not WordPress. `ninjacharge/old` is WP 3.3 (akismet 2.5.3, all-in-one-seo-pack 1.6.13.8, fancybox-for-wordpress 3.0.1, google-sitemap-generator 3.2.6, simple-301-redirects 1.03, others; theme recloud; DB `salescharge`). It also holds a file named `se.php`; I only confirmed the filename.
 - **Not served by any vhost** (no `server_name`): `webdesign/chass`, `webdesign/gea`, `webdesign/centralcleaners`, `ninjacharge/old`, and every `site_old`.
 
-`wp-file-manager` is installed in 9 trees (2sto, dev, dev2, site, executive, prestige, success, victory, victory/site_old) at versions 7.1.6, 7.2, 8.0.4 and 8.0.6. Worth reviewing whether it is needed.
+**2026-10-09: removed from every served site** (live, dev, 2sto, executive, victory, prestige, success); dev2 is quarantined; only `victory/site_old` (unserved) still has a copy. Before that: `wp-file-manager` was installed in 9 trees (2sto, dev, dev2, site, executive, prestige, success, victory, victory/site_old) at versions 7.1.6, 7.2, 8.0.4 and 8.0.6. Worth reviewing whether it is needed.
 
 ## Cron
 No user crontab for `claude`. User crontabs are unreadable to me. In `/etc/cron.d`:

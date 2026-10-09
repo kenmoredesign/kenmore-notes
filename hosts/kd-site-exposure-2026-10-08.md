@@ -501,3 +501,13 @@ directory, the old ninjacharge site) is not protected by them. Neither directory
 root, and the deny snippet blocks dotfiles on every vhost, so they are not reachable over the
 web; they were reachable through the old catch-all until 2026-10-08. Apache MD5 hashes are weak:
 if either password is reused anywhere, treat it as known.
+
+## 2026-10-09 root window, 15:59 to 16:00 UTC
+
+- **WP File Manager removed from prestige and success** (7.2 on both) the same way as the other
+  five: plugin directory archived to `/var/backups/kenmore-ops/changes-20261009/wp-file-manager-<site>.tar.gz`,
+  deactivated, deleted. Home and login pages unchanged. No served site has the plugin any more;
+  the only copy left under the web root is in the unserved `kdtemplates/victory/site_old`.
+- **Both `.htpasswd` files moved to quarantine** as `kdtemplates.htpasswd` and
+  `ninjacharge-old.htpasswd` (root, 600), with manifest entries. No `.htpasswd` remains under
+  `/var/www/html`.
