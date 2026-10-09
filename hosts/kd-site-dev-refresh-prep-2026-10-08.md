@@ -177,3 +177,44 @@ as described above.
 | `wp-content/backups-dup-lite/` | 12 K, 2 files (`.htaccess`, `robots.txt`) | Duplicator's backup folder, empty of backups |
 | `wp-content/wflogs/` | 8 K, 1 file (`.htaccess`) | Wordfence's log folder, not a backup; excluded with it since it is live-only state |
 | `wp-content/plugins/wordfence/` | 76 K, 8 `.htaccess` files in an empty directory skeleton | What is left of a removed Wordfence. **Not excluded**: it is under `plugins/`, and excluding one plugin folder would make dev's plugin tree differ from live's. It is not a working plugin |
+
+## Refresh run, 2026-10-09 11:52 to 11:57 UTC
+
+dev was refreshed from live with `refresh-dev-from-live.sh --run` (defaults), in a root window.
+
+- **Backup of dev before the refresh:** `/var/backups/kenmore-ops/kdsites/dev-backup-2026-10-09_115226.zip`
+  (2.66 GB, root-only; 35,808 entries including `dev-backup-2026-10-09_115226.sql`, 271 MB, and
+  dev's `wp-config.php`). Run log: `refresh-dev-2026-10-09_115226.log` beside it.
+- **Result:** dev's database is live's as of 11:52 (2,811 posts and pages, newest 11:33 that
+  day), 140,497 URL replacements, files identical to live outside the preserved and excluded
+  paths (checksum compare: 0 differences). `blog_public` 0; site-wide head, body and footer code
+  emptied, so dev pages carry no GTM and no Chatwoot; no mention of the live host in dev's pages.
+  dev's `wp-config.php` was not touched (still the file from the salts shuffle), so dev still
+  holds the old SendPulse pair until the owner replaces it.
+- **Live:** not written to. Same post count and newest change before and after, tags intact,
+  no file written by the run, home and contact pages 200.
+- **Checked after:** dev home, contact, Arabic home and login return 200; forms pass the
+  capture-mode browser test in English and Arabic at both widths; no PHP fatal.
+
+Two faults in the script showed up in this first real run. Both were fixed and committed.
+
+1. **First attempt (11:51) stopped at the backup step** before anything was modified: the web
+   user cannot write a dump into the root-only backup directory. dev was put back online
+   automatically. Fix: the dump goes to `/tmp` and into the zip from there.
+2. **Second attempt completed steps 1 to 6, then failed at the last command.**
+   `wp maintenance-mode deactivate` reported "already deactivated": something had removed the
+   `.maintenance` file during the run (not identified; the dev cron job that started at 11:52:01
+   is a candidate). The error handler then did what it is meant to do after a late failure and
+   put dev into maintenance mode, although the refresh itself was complete. The flag was removed
+   by hand at 11:59 and dev checked. dev showed the maintenance page for about 3 minutes longer
+   than needed. Fix: the script now writes and removes the flag file itself. That also closes a
+   gap: WP-CLI's flag carries a fixed timestamp that WordPress ignores after 10 minutes, so a
+   longer run would have left the site open mid-refresh. `migrate-dev-to-live.sh` uses the
+   WP-CLI flag for live and has that same 10-minute limit.
+
+Leftover on kd-site: `/root/refresh-run.log` (console output of the run, no secrets).
+
+**Correction:** kenmore-translate on this site is set to provider `openai` with model
+`gpt-5.4-mini`; the API key in `kt_api_key` is an OpenAI key, not DeepSeek as the plugin's
+README and earlier notes here say. It is stored in the database, so it is in every database
+dump: the restore points, the UpdraftPlus sets and the dev backup above.
