@@ -361,6 +361,14 @@ ssh kd-site 'sudo /usr/local/lib/kenmore-ops/wp site db query "SELECT id, create
 `failed`, `honeypot`, `too_fast`, or `received` (PHP died before SendPulse answered). Times are UTC.
 The table holds personal data (the posted fields, IP, user agent) and has no retention rule yet.
 
+**Proven on live at 15:55 UTC on 2026-10-09.** One TEST lead was submitted through live's
+contact form with Playwright (owner's instruction; `testeeee+27@kedddd.com`, name and company
+prefixed TEST). The table was created by that submission and holds one row: id 1, status
+`created`, SendPulse contact id **43966477**, no error, source `2a01:4f8:1c16:dcc1::1` (the Ops
+box), country `DE`, all 18 posted fields stored. The server answered 200 with the success
+message and logged no SendPulse or PHP error. Contact 43966477 is to be deleted from the CRM;
+row 1 of the log is a test row.
+
 ### What the audit established
 
 - The forms are the theme's own AJAX handler, not Contact Form 7. One handler, six placements

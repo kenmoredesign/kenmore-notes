@@ -25,3 +25,4 @@ n,sent_at_utc,email,sendpulse_contact_id,log_status,firstname,lastname,company,f
 24,2026-10-09T12:51:46,testeeee+24@kedddd.com,43962914,created,TEST Anna,TEST Probe,TEST Kenmore audit,contact,zh,desktop,website www no scheme
 25,2026-10-09T12:51:58,testeeee+25@kedddd.com,43962918,created,TEST Anna,TEST Probe,TEST Kenmore audit,contact,en,mobile,website full URL
 26,2026-10-09T12:52:10,testeeee+26@kedddd.com,43962924,created,TEST Anna,TEST Probe,TEST Kenmore audit,contact,ar,desktop,website with spaces
+27,2026-10-09T15:55:58,testeeee+27@kedddd.com,43966477,created,TEST Anna,TEST Probe,TEST Kenmore audit,contact (LIVE),en,desktop,baseline on live
