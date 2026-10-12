@@ -217,3 +217,82 @@ Differences to expect from an empty deploy, known now:
   plugins); the URL rewrite may change them.
 - Row counts in tables that live writes to by itself (redirect logs, WP Rocket, Yoast).
 - The refresh will remove `esteban` from dev, since dev becomes a copy of live.
+
+## Phase 2: refresh, then an empty deploy (2026-10-12, root window 09:25 to 10:12 UTC)
+
+Scripts from ops `ae564ef`, copied to `/root/kdsites-run/` on kd-site (checksums compared) and
+run from there. Nobody edited live or dev during the run.
+
+| When (UTC) | What |
+|---|---|
+| 09:24 | Before-snapshot of live, as `claude`: `~claude/deploy-snap/before/` |
+| 09:28 to 09:32 | `refresh-dev-from-live.sh --run`: complete, no error. dev backup `dev-backup-2026-10-12_092827.zip`, record `refresh-record-2026-10-12_092827` |
+| 09:39 to 09:43 | `deploy-dev-to-live.sh --run`: complete, no error. Backup `live-restorepoint-2026-10-12_093922.zip` (2.5 G; dump 59 of 59 tables, integrity test passed) |
+| 09:41:04 to 09:43:49 | **Live in maintenance mode: 165 seconds.** 16 requests got a 503; none was a form submission |
+| 09:44 | After-snapshot: `~claude/deploy-snap/after/` |
+| 09:46 | One TEST lead through live's contact form |
+
+Before the refresh, dev differed from Friday's refresh in files only: its own `wp-config.php`,
+`advanced-cache.php`, two generated robin-image-optimizer files, and `actions.php` plus 13
+automatic translation files that were byte-identical to live's. No content or user change.
+
+### Every difference on live, before against after
+
+**Files.** 30,872 files hashed (everything outside the three cache folders): **no file differs,
+none added, none removed.** Owner, mode, size and time of all 34,756 paths: 4 differences, all
+directory modification times (the site root, `wp-content`, `wp-content/cache`, `uploads/cache`).
+
+**Rows per table.** 56 of 60 equal. The four that differ:
+
+| Table | Before | After | Why |
+|---|---|---|---|
+| `wp_actionscheduler_actions` | 179 | 185 | queue activity |
+| `wp_actionscheduler_logs` | 537 | 551 | queue activity |
+| `wp_irrp_redirection_logs` | 39,296 | 39,303 | 7 redirects served |
+| `wp_options` | 867 | 873 | 6 more transients (99 to 105) |
+
+**Table checksums.** 52 of 60 identical, among them `wp_posts`, `wp_postmeta`, `wp_users`,
+`wp_usermeta`, the term tables and `leadlog_kenmore_sage`. The eight that differ are the four
+above and:
+
+| Table | What changed |
+|---|---|
+| `wp_blc_links` | one link checked at 09:25:03, by the link checker itself before the run |
+| `wp_duplicator_entities` | one row rewritten by Duplicator at 09:44:50 |
+| `wp_wpr_rocket_cache` | all 2,699 URLs back to pending: the page cache was emptied and the preload is refilling it |
+| `wp_yoast_indexable` | all 2,920 rows carry `updated_at` 09:43:28, the moment of the URL rewrite. Row count equal. That only this timestamp differs is my reading, not proven row by row |
+
+**Options.** 768 before and after. Seven differ:
+
+| Option | Difference |
+|---|---|
+| `termly_website` | the dev host name inside it became www (one replacement more than the refresh made). Leftover of a removed plugin |
+| `active_plugins` | same 25 plugins, same length, different hash: the order of entries changed when the link checker was activated again |
+| `recently_activated` | now lists the link checker |
+| `cron` | 8,024 to 7,511 bytes. Straight after the deploy the link checker's three jobs were missing; they were back at 09:45 |
+| `acf_pro_license_status`, `action_scheduler_lock_async-request-runner`, `dupli_opt_expire_dupli_opt_frotend_delay` | timestamps the plugins rewrite by themselves |
+
+`optml_settings` still contains the dev host name, as before (predicted to change; it did not).
+
+**Identical:** the snippet option (all 10 keys), WP Rocket's settings (all 80 keys, preload 1),
+`blog_public` 1, `home` and `siteurl`, the plugin list with versions (25 active of 28), the 6
+users, the lead log, `robots.txt` as served.
+
+### Checks
+
+- Home, `/contact-us/`, `/ar/` and `wp-login.php`: 200 before and after. GTM-TZW9SC6J and the
+  Chatwoot host are in the source of all three pages; no noindex; no dev host name.
+- In a browser on `/contact-us/`: requests to googletagmanager.com, Chatwoot, PostHog, Clarity
+  and Google Analytics; no JavaScript error.
+- **TEST lead** (`testeeee+28@kedddd.com`, TEST Anna / TEST Deploy), 09:46:09: server answered
+  200 with the success message. Lead log row **id 2**, `2026-10-12 09:46:10`, status `created`,
+  **SendPulse contact 44014040**, country DE, no error. To delete from the CRM.
+- No PHP fatal and no SendPulse error in the nginx error log since the run.
+
+### Left on kd-site
+
+`/root/kdsites-run/` (both scripts and their console logs), `~claude/deploy-snap/`,
+`deploy-work-2026-10-12_093922/` beside the backups (guard files, the four saved key values).
+The undo commands for this deploy are at the end of `deploy-2026-10-12_093922.log`.
+Disk: 11 GB free (85% used) after the two backups of this run. The old
+`/var/www/html/kdsites/migrate-dev-to-live.sh` is still in place and must not be run.
