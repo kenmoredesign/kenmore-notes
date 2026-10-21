@@ -96,13 +96,11 @@ needs "Fix slugs" afterwards**. Also to do: turn off auto-updates for Polylang.
 
 - **Deploy:** backup `/var/backups/kenmore-ops/kdsites/live-restorepoint-2026-10-21_141005.zip`;
   restore commands at the end of `deploy-2026-10-21_141005.log` in the same folder.
-- **Settings restore:** live's values from before 13:34 are in `kdrestore_prev_options` (live's
-  database, no prefix; the deploy leaves such tables alone). Undo commands at the end of
-  `restore-settings-2026-10-21_133438.log`. Drop `kdrestore_prev_options` and
-  `kdrestore_rp_options` once no longer needed.
-- **Key:** the old (revoked) key is in `~claude/kt-backup-20261021/dev-kt_api_key-before.txt`; it
-  is no rollback, it does not work. The DB dumps in that folder hold the new key; delete the
-  folder when done.
+- **Settings restore:** no separate undo left. `kdrestore_prev_options` and `kdrestore_rp_options`
+  were dropped at 14:40 once www was verified; the restore points above and the 10:46 one cover
+  rollback.
+- **Dev backups as claude:** `~claude/kt-backup-20261021/` deleted at 14:40 (it held DB dumps with
+  the new key). The refresh's own backup `dev-backup-2026-10-21_133514.zip` is root-only.
 - Scripts and console logs of the root window: `/root/kdsites-run/2026-10-21/`.
 - **`/var/www/html/kdsites/readme.txt` was the source of the morning's mistake:** it told people to
   run `migrate-dev-to-live.sh`. Rewritten at 14:36 (old copy:
@@ -112,3 +110,21 @@ needs "Fix slugs" afterwards**. Also to do: turn off auto-updates for Polylang.
   scripts are now installed next to it (root 644, run with `sudo bash`, same checksums as ops
   `de97999`), and both dry runs work from there. The readme is kept in ops as `kdsites/readme.txt`.
   `migrate-dev-to-live.OLD` is still next to it, unchanged; the readme says not to use it.
+
+## 6. Open, for the next session
+
+1. **Polylang Slug 0.2.3 vs Polylang 3.9.0** (section 4). Until it is fixed, every new
+   translation needs "Fix translated slugs" (Settings > AI Translate > Slugs) before a deploy.
+2. **Polylang auto-updates off** on dev and live, so a Polylang release cannot change this again
+   unannounced.
+3. **Switch kenmore-translate to Codex LB.** Settings only, no code change: `kt_endpoint` =
+   `http://100.85.194.92:2455/v1/chat/completions`, `kt_model` = `gpt-5.6-terra`, `kt_api_key` = a
+   dedicated kd-site key from Alex (set through stdin). `kt_provider` stays `openai`, so no
+   temperature is sent. On dev first, then deploy. Check before: `/v1/models` with the new key
+   from kd-site, `response_format: json_object` and `choices[0].message.content` on that route,
+   and the time for a full article against the fixed 120 s timeout. The current OpenAI key stays
+   as the rollback.
+4. **Where the three kdsites scripts live.** Today they are next to `readme.txt` in
+   `/var/www/html/kdsites/` (root 644, `sudo bash`). Not moved to `/usr/local/lib/kenmore-ops/`:
+   claude has `NOPASSWD: /usr/local/lib/kenmore-ops/*`, so a script there could be run as root
+   without a root window. Decide the location first.

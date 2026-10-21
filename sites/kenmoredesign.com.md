@@ -25,3 +25,5 @@ a restore point if a deploy ever copies dev's over them.
 - **Open (2026-10-21):** new translations are created with `-2`…`-12` slugs; run the plugin's
   "Fix slugs" for the source post afterwards. Cause under investigation (Polylang Slug vs
   Polylang 3.9.0). Details: `hosts/kd-site-translate-2026-10-21.md`.
+- **Next (planned):** provider switch to Codex LB on Jenny, settings only. See section 6 of
+  `hosts/kd-site-translate-2026-10-21.md`.
