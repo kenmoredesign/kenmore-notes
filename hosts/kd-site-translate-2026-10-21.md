@@ -104,6 +104,11 @@ needs "Fix slugs" afterwards**. Also to do: turn off auto-updates for Polylang.
   is no rollback, it does not work. The DB dumps in that folder hold the new key; delete the
   folder when done.
 - Scripts and console logs of the root window: `/root/kdsites-run/2026-10-21/`.
-- `/var/www/html/kdsites/readme.txt` still tells people to run `migrate-dev-to-live.sh`. That is
-  how it was run today. Not changed: it should point at `deploy-dev-to-live.sh`, which is
-  only installed in `/root/kdsites-run/`, not next to the readme.
+- **`/var/www/html/kdsites/readme.txt` was the source of the morning's mistake:** it told people to
+  run `migrate-dev-to-live.sh`. Rewritten at 14:36 (old copy:
+  `/var/backups/kenmore-ops/kdsites/readme.txt.bak-2026-10-21`): refresh before working on dev,
+  nobody edits www until the deploy, deploy with `deploy-dev-to-live.sh`, what to do if the guard
+  stops it, "Fix translated slugs" after translating, and the settings restore. The three
+  scripts are now installed next to it (root 644, run with `sudo bash`, same checksums as ops
+  `de97999`), and both dry runs work from there. The readme is kept in ops as `kdsites/readme.txt`.
+  `migrate-dev-to-live.OLD` is still next to it, unchanged; the readme says not to use it.
