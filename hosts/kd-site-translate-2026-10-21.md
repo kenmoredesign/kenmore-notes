@@ -124,7 +124,7 @@ needs "Fix slugs" afterwards**. Also to do: turn off auto-updates for Polylang.
    from kd-site, `response_format: json_object` and `choices[0].message.content` on that route,
    and the time for a full article against the fixed 120 s timeout. The current OpenAI key stays
    as the rollback.
-4. **Where the three kdsites scripts live.** Today they are next to `readme.txt` in
-   `/var/www/html/kdsites/` (root 644, `sudo bash`). Not moved to `/usr/local/lib/kenmore-ops/`:
-   claude has `NOPASSWD: /usr/local/lib/kenmore-ops/*`, so a script there could be run as root
-   without a root window. Decide the location first.
+4. **Next root window on kd-site:** install the updated `readme.txt` from ops `kdsites/` (adds why
+   the deploy needs a fresh refresh, and section "2. WORK ON DEV"), and rename
+   `migrate-dev-to-live.OLD` to `migrate-dev-to-live.OLD.retired` (the readme already uses that
+   name). The three scripts stay where they are, next to the readme (decided 2026-10-21).
