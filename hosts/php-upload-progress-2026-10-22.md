@@ -41,8 +41,28 @@ and doesn't see pool-level overrides. The script's pool scan covers pool overrid
 the docroot scan reports those.
 
 Tested 2026-10-22: preview run as claude (non-root) on all three hosts. It found the
-expected versions, values On, and no overrides. Not yet installed or applied anywhere.
+expected versions, values On, and no overrides.
 
 ## Run log
 
-(fill in per box: date, installed, preview output, apply output, verified value)
+### kd-site: done 2026-10-22 10:35 UTC (root window)
+
+- Installed 10:34. sha256 `13a60b9e…7f7d128`, the same as `~/ops` at `40bfae8`.
+- Preview as root: 25 docroots from `nginx -T`, no `.user.ini`/`php.ini`, no pool
+  overrides. Both versions On.
+- **Cosmetic:** the preview's "current config test" line for 8.1 was empty.
+  `php-fpm8.1 -t` ends its output with a blank line and the script prints the last
+  line. Run by hand, it exited 0 with "test is successful". The decision uses the exit
+  code, so behaviour is unaffected. The apply output showed the message normally.
+- `--apply` (exit 0): drop-ins written for 8.1 and 8.3, both `-t` passed, both reloaded
+  and active, and `php-fpm -i` shows **Off** for both.
+  Log: `/var/backups/kenmore-ops/php-upload-progress-2026-10-22_103511/run.log`. No
+  backups were needed (no drop-in existed before).
+- After: www.kenmoredesign.com, 2sto.net and ninjacharge.com answer 200.
+- Undo: `rm /etc/php/8.{1,3}/fpm/conf.d/99-kenmore-upload-progress.ini`, then
+  `php-fpm8.X -t --fpm-config /etc/php/8.X/fpm/php-fpm.conf && systemctl reload php8.X-fpm`
+  for each.
+
+### wp-asia: pending
+
+### wp-eu: pending
