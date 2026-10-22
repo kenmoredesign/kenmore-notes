@@ -1,6 +1,6 @@
 # session.upload_progress.enabled = 0 on every PHP host
 
-2026-10-22. Requested because of a newly disclosed PHP vulnerability. **PHP itself is
+2026-10-22. **Done on all three hosts the same day.** Requested because of a newly disclosed PHP vulnerability. **PHP itself is
 not updated.** Only this one ini setting changes.
 
 ## State before (read-only survey, 2026-10-22)
@@ -76,4 +76,24 @@ expected versions, values On, and no overrides.
 - After: 8itrade.com and rforex.trade answer 200.
 - Undo: `rm /etc/php/8.5/fpm/conf.d/99-kenmore-upload-progress.ini && php-fpm8.5 -t --fpm-config /etc/php/8.5/fpm/php-fpm.conf && systemctl reload php8.5-fpm`
 
-### wp-eu: pending
+### wp-eu: done 2026-10-22 10:39 UTC (root window)
+
+- Installed 10:38, sha256 `13a60b9e…7f7d128` (the same as the other two).
+- Preview as root: 11 docroots (the 8 `/srv/livechat/*`, alverix, zentro,
+  letsencrypt). No `.user.ini`/`php.ini`, no pool overrides. 7.4 and 8.5 On. The 7.4
+  config-test line was blank for the same trailing-blank-line reason as kd-site 8.1;
+  run by hand, `php-fpm7.4 -t` exited 0 "successful".
+- `--apply` (exit 0): drop-ins written for 7.4 and 8.5, both `-t` passed, both reloaded
+  and active, and `php-fpm -i` shows **Off** for both. Log:
+  `/var/backups/kenmore-ops/php-upload-progress-2026-10-22_103919/run.log`. No backups were
+  needed.
+- After: www.alverix.net, www.zentrobrokerage.com and the five chats whose DNS reaches
+  wp-eu (alve, ngelpartners, thaurusguru, sto, westernfx) answer 200. vin, pcxfx and nc
+  are down because of DNS (old box gone), not this change, and weren't checked.
+- Undo: `rm /etc/php/{7.4,8.5}/fpm/conf.d/99-kenmore-upload-progress.ini`, then
+  `php-fpmX -t --fpm-config /etc/php/X/fpm/php-fpm.conf && systemctl reload phpX-fpm`
+  for each.
+
+**All three hosts done: five FPM versions, all Off.** The script stays installed in
+`/usr/local/lib/kenmore-ops/` on each host, so a re-run (e.g. after a new PHP version is
+added) needs no root window: `sudo /usr/local/lib/kenmore-ops/php-upload-progress-off [--apply]`.
