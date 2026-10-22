@@ -4,6 +4,16 @@ Revised 2026-10-05 for the decisions of that day (forwarding instead of a databa
 link). The 2026-10-02 Gate A plan is in git history. Facts behind it: `livechat-old.md`
 and the 2026-10-02 section of `wp-eu.md`. Scripts: `~/ops/livechat/`.
 
+**Status 2026-10-22: livechat-old is decommissioned** (user; SSH to 172.105.248.251
+times out). Checked from here that day: alve (chat.alverix.net, now behind the Cloudflare
+proxy, no longer DNS-only), ngelpartners, thaurusguru, sto and westernfx answer 200, so
+their DNS moved. sto and westernfx point at 91.99.203.165. **Three are down:** vin
+(chat.vinnexiacapital.com) and pcxfx (chat.pcxfx.com) return Cloudflare 522, meaning
+their client-held origin records still point at the old box. nc (chat.niivesh.com) is
+still an A record to 172.105.248.251 at Namecheap and times out. Each needs its record
+moved to 91.99.203.165 by the client (see the DNS table). The chats themselves run on
+wp-eu.
+
 **Status 2026-10-05 13:05 UTC: all eight chats are cut over.** livechat-old forwards
 each one to wp-eu over HTTPS; the chats run on wp-eu from wp-eu's MySQL. Remaining:
 the DNS changes below, then retiring the forwarding and the old box.
