@@ -63,6 +63,17 @@ expected versions, values On, and no overrides.
   `php-fpm8.X -t --fpm-config /etc/php/8.X/fpm/php-fpm.conf && systemctl reload php8.X-fpm`
   for each.
 
-### wp-asia: pending
+### wp-asia: done 2026-10-22 10:37 UTC (root window)
+
+- Installed 10:37, sha256 `13a60b9e…7f7d128` (the same as kd-site).
+- Preview as root: 3 docroots (`8itrade.com/public`, `rforex.trade/public`,
+  `default`). This was the first look inside the site trees, which claude can't read.
+  No `.user.ini`/`php.ini`, no pool overrides. 8.5 On, `-t` successful.
+- `--apply` (exit 0): drop-in written, `-t` passed, php8.5-fpm reloaded and active, and
+  `php-fpm8.5 -i` shows **Off**. Log:
+  `/var/backups/kenmore-ops/php-upload-progress-2026-10-22_103724/run.log`. No backups were
+  needed.
+- After: 8itrade.com and rforex.trade answer 200.
+- Undo: `rm /etc/php/8.5/fpm/conf.d/99-kenmore-upload-progress.ini && php-fpm8.5 -t --fpm-config /etc/php/8.5/fpm/php-fpm.conf && systemctl reload php8.5-fpm`
 
 ### wp-eu: pending
