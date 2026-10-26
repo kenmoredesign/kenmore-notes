@@ -79,3 +79,81 @@ The survey ran as root over a CA-certificate root window (`approve-root uptime 3
   - a `tmux` session `nextcloud` running Claude Code for 33 days, about 350M RSS;
   - a Claude Code remote server, running for 121 days;
   - the `kenmore-process` timer.
+
+## Gate 2: archive (done 2026-10-26)
+
+- **Before the archive:** I stopped and disabled claude's `kenmore-process.timer`, so the automation copy would be consistent.
+- **Dumps:**
+  - `mautic-db-1` and `kenmore-planka-db` were started only for their dumps and stopped again.
+  - Mautic: `mysqldump` with the container's own credentials, 124 tables, ends "Dump completed".
+  - Planka: `pg_dump -Fc` (checked with `pg_restore --list`, 34 tables with data) plus the globals.
+  - Host: `mariadb-dump premiumfx_wp` plus the `premiumfx_usr` grants.
+- **Archive:** 15 files, 432M, staged in `/root/archive-2026-10-26/` (root-only) with `SHA256SUMS`:
+  - the dumps;
+  - tars of all Mautic volumes (10) and Planka volumes (4);
+  - `/home/est/mautic` (compose files, `.env`, build context);
+  - `/opt/kenmore/planka` and `/etc/nginx`;
+  - `/opt/kenmore/automation` with the timer and service units. The venv was left out; a package list made from the dist-info names was kept instead, so root never ran claude-owned code.
+  - the premium trees, `premium-CREDENTIALS.txt` and `premiumfx-migration`;
+  - `/etc/mysql`, `/etc/php/8.3` and `/etc/caddy` (without `certs/`);
+  - the old Kuma leftovers.
+- **Where it went:** rclone to `archive:uptime/2026-10-26/`.
+  - `archive` is a crypt remote on top of `wasabi`. It encrypts contents only; folder and file names stay readable.
+  - The bucket is `decomrooms`. The key is IAM user `decom-maksym`, a no-delete key; alex confirmed it's the intended one.
+  - The rclone config is root-only on the host. It was never read.
+- **The first upload failed** with `AccessDenied ... s3:CreateBucket`: the bucket name in the config was wrong, and rclone tries to create the bucket by default. alex fixed the name and set `no_check_bucket`.
+- **Verification:**
+  - By the rerun, all 15 objects were already present.
+  - `rclone cryptcheck` against the local files: 15 matching, 0 differences.
+  - `rclone check --size-only`: 15 matching.
+  - The listing's sizes are identical to the local files.
+
+## Gate 3: removal (done 2026-10-26)
+
+Four root windows were used in all. Gate 3 itself ran from 15:56 to 16:03 UTC. It stopped twice, and each time alex approved the next step.
+
+1. **Mautic:** 4 containers, 10 volumes, network `mautic_default`, the images `kenmore/mautic-ses`, `mautic/mautic` and `mysql:8.4`, and `/home/est/mautic`.
+2. **Planka and automation:** 2 containers, 4 volumes, network `planka_default`, the images `plankanban/planka` and `postgres:14-alpine`, `/opt/kenmore/planka`, `/opt/kenmore/automation`, and the `kenmore-process` units (followed by claude's `systemctl --user daemon-reload`).
+3. **Premium WordPress:** `/var/www/html/premium`, `/var/www/premium-backups`, `/var/www/premium-source`, `premium-CREDENTIALS.txt` and `/home/est/premiumfx-migration`.
+4. **Host services:**
+   - Purged the explicit list `mariadb-server{,-core}`, `mariadb-client{,-core}`, `mariadb-common`, `libmariadb3`, `galera-4`, `php-common`, all `php8.3-*` and `nginx-common`.
+   - Deleted `/var/lib/mysql`, `/etc/mysql`, `/etc/php`, `/etc/nginx` and their logs.
+   - Kept `mysql-common`.
+   - Did **not** run `apt autoremove`: it would also remove `python3-docker`, `python3-compose` and others, which weren't part of this approval.
+   - **First stop:** the script's guard caught `libmariadb3`, which the purge would take along because it depends on `mariadb-common`. The only other package depending on it was `mariadb-client-core`, which was on the list anyway. alex approved adding it, and steps 4–9 were rerun.
+5. **Old Kuma leftovers:** volumes `root_uptime-kuma-data` and `uptime-kuma_uptime-kuma-data`, networks `root_default` and `uptime-kuma_default`, and the compose files `/root/docker-compose.yml` and `/opt/uptime-kuma/docker-compose.yml`. `cert.pem` and `key.pem` in `/opt/uptime-kuma` were kept. Dangling images and build cache were pruned.
+6. **Caddy:** removed the `mailer.kenmorefx.com` block and the commented-out planka and premium blocks.
+   - The previous file is `/etc/caddy/Caddyfile.bak-20261026-gate3`.
+   - The new file passed `caddy validate`, followed by `systemctl reload caddy` (a reload, not a restart).
+   - **Second stop:** the script's first test request after the reload timed out (curl exit 28).
+   - Checked right after: both sites answer through Caddy (302; `status.php` and `/login` 200). Nextcloud was busy with a large WebDAV/rclone download. A direct request to `127.0.0.1:8081` that bypassed Caddy hung, most likely because its Apache workers were all occupied. Nothing went down. alex approved continuing with steps 7–9 unchanged.
+7. **`/opt/kenmore`** is now `root:root 755`. claude keeps `.claude`, `PROJECT.md`, the `CLAUDE.md` link and `proposals`; `nextcloud` stays root.
+8. **Cleanup:**
+   - deleted `/root/.npm` and `/home/claude/.npm`;
+   - vacuumed the journal (now 80M);
+   - deleted `/var/log/btmp.1`;
+   - ran `apt-get clean`.
+
+   Before this, as claude: ended the tmux `nextcloud` Claude Code session and stopped the Claude Code remote server. Claude Code won't be used on this host again.
+9. **Uptime Kuma recreated last**, with the same image, port, volume and restart policy, plus `--log-opt max-size=10m --log-opt max-file=3`.
+   - The old container was renamed and kept until the new one was healthy, then removed together with its 421M log.
+   - Down from 16:02:12 to 16:02:23 UTC, about 11 seconds.
+   - :3001 answers 302, directly and through Caddy.
+   - Chromium is no longer installed in the container. No monitor is of the real-browser type.
+10. **Archive check and local delete:** `cryptcheck` run once more (15 matching, 0 differences), then `/root/archive-2026-10-26/` was deleted.
+
+### Result
+| | before | after |
+|---|---|---|
+| Free on `/` | 11G (25G used) | **21G** (15G used) |
+| Available RAM | 2270M | **2584M** (about 2.52Gi) |
+| Containers | 10 (4 running) | 4 running: nextcloud-app, -db, -redis and uptime-kuma |
+| Images | 9 | 4: nextcloud, redis, mariadb:11, uptime-kuma |
+| Host services | caddy, mariadb, php8.3-fpm (and a failed nginx unit) | caddy |
+
+**Fit check for Invoice Ninja (target ≥20G free and ≥2.5G available): passed without a rescale.** The RAM margin is thin, about 2.52Gi against 2.5. After Invoice Ninja's steady state (about 0.8–1G), roughly 1.5G is left for Chrome's spikes, with 4G of swap behind it.
+
+Not changed and still open:
+- Uptime Kuma is public on port 3001 (ufw inactive).
+- The `est` account still exists.
+- `cloud-init-hotplugd.service` is in a failed state. That has nothing to do with this cleanup, and I didn't look into it.

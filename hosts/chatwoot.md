@@ -1,5 +1,12 @@
 # chatwoot
 
+**Status 2026-10-26: commissioned.**
+- **Access:** claude logs in with the `wp` key. Its only sudo is the scoped `kenmore-ops` grant, `sudo -n true` is refused, and `docker` is refused.
+- **sshd:** `00-kenmore.conf` is in place, with the root principal `chatwoot`.
+- **ops pinned host key:** ED25519 `SHA256:eGDhohEd2ff1SWI78AYXIaAhEdS96wxxcqsIwJbpGEI`, confirmed by alex on the box. ssh added the host's RSA and ECDSA keys itself on login.
+- **Not tested yet:** root by certificate.
+- The pre-flight record below describes the state before commissioning.
+
 Hetzner, Ubuntu 26.04.1 LTS. Runs the Chatwoot customer-messaging stack. Not a WordPress host. **Not yet commissioned.** Everything below comes from alex's pre-flight output of 2026-10-26, run on the host. Nothing was read from ops, because ops had no login yet.
 
 ## Host

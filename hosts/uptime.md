@@ -1,5 +1,15 @@
 # uptime
 
+**Status 2026-10-26: commissioned and cleaned up.**
+- **Access:** claude logs in with the `wp` key. Its only sudo is the scoped `kenmore-ops` grant, and it's no longer in the `docker` group. Root works only with a CA certificate for principal `uptime`; the first such login was tested 2026-10-26.
+- **ops pinned host key:** ED25519 `SHA256:6VkmoO+s19EAs8GfcJxq+Crc7WPQXJAJs3Cg/0aiFLA`, confirmed by alex on the box.
+- **est:** removed from `sudo` and `docker` by alex.
+- **AllowUsers:** briefly trimmed to `alex` on 2026-10-26, then restored to `alex claude root`. `00-kenmore.conf` matches commission.sh again.
+- **Removed 2026-10-26** (see [uptime-cleanup-2026-10-26.md](uptime-cleanup-2026-10-26.md)): Mautic, Planka, the automation pipeline, the premium WordPress, and the host MariaDB, php8.3 and nginx.
+- **Runs now:** Caddy on the host (`uptime.kenmorefx.com`, `cloud.kenmorefx.com`), Uptime Kuma (log capped at 10m × 3) and Nextcloud.
+- **Resources:** 21G free on `/`, about 2.5G RAM available.
+- The pre-flight record below describes the state before commissioning.
+
 Hetzner, Ubuntu 24.04.4 LTS, hostname `UptimeMonitor`. Runs Caddy on the host, Uptime Kuma and Nextcloud (`/opt/kenmore/nextcloud`). The Mautic and Planka stacks are present but stopped. Not a WordPress host. **Not yet commissioned.** The facts below come from alex's pre-flight output of 2026-10-26, run on the host. The Nextcloud path and the stopped Mautic/Planka stacks come from alex's brief, not from the pre-flight. Nothing was read from ops, because ops had no login yet.
 
 ## Host

@@ -22,17 +22,17 @@ Surveyed 2026-09-30, read-only, as `claude` without sudo. Per-host detail is in 
 
 ## Other hosts (not WordPress)
 
-These hosts aren't covered by the 2026-09-30 survey above. matrix is described in [matrix.md](matrix.md). The two Hetzner boxes below were added 2026-10-26 from alex's pre-flight and are **not yet commissioned**.
+These hosts aren't covered by the 2026-09-30 survey above. matrix is described in [matrix.md](matrix.md). The two Hetzner boxes below were added 2026-10-26 and commissioned the same day. uptime was also cleaned up that day ([uptime-cleanup-2026-10-26.md](uptime-cleanup-2026-10-26.md)).
 
 | | chatwoot | uptime |
 |---|---|---|
 | Tailnet IP | 100.87.57.35 | 100.92.64.4 |
-| Role | Chatwoot customer messaging (Docker, own Caddy on 80/443) | Caddy on the host; Uptime Kuma and Nextcloud in Docker; Mautic and Planka stopped |
+| Role | Chatwoot customer messaging (Docker, own Caddy on 80/443) | Caddy on the host; Uptime Kuma and Nextcloud in Docker (Mautic, Planka, host MariaDB/PHP removed 2026-10-26) |
 | OS | Ubuntu 26.04.1 | Ubuntu 24.04.4 |
-| vCPU / RAM | 2 / 3.7Gi (2.0Gi used) | 2 / 3.7Gi (1.6Gi used) |
-| Free on / | 21G | **11G** |
+| vCPU / RAM | 2 / 3.7Gi (2.0Gi used, 1.7Gi available) | 2 / 3.7Gi (about 2.5Gi available after the cleanup) |
+| Free on / | 21G | 21G (11G before the cleanup) |
 | Firewall | ufw active (rules not listed) | ufw **inactive**; Uptime Kuma public on 3001 |
-| Before commissioning | claude NOPASSWD:ALL; root password login allowed | same, plus an extra login user `est`, whom `AllowUsers` will lock out |
+| Access | commissioned 2026-10-26 (root by certificate not tested yet) | commissioned 2026-10-26; root by certificate tested; `est` out of sudo/docker and blocked by `AllowUsers` |
 
 Detail: [chatwoot.md](chatwoot.md), [uptime.md](uptime.md).
 
