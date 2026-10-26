@@ -20,6 +20,22 @@ Surveyed 2026-09-30, read-only, as `claude` without sudo. Per-host detail is in 
 | wp-cron | system cron every 5 min per site | none visible | system cron for 2 of the trees |
 | Extras | Redis (unused by the sites), Cloudflare IP timer | fail2ban | dead `ditto` proxy target (port 3000) |
 
+## Other hosts (not WordPress)
+
+These hosts aren't covered by the 2026-09-30 survey above. matrix is described in [matrix.md](matrix.md). The two Hetzner boxes below were added 2026-10-26 from alex's pre-flight and are **not yet commissioned**.
+
+| | chatwoot | uptime |
+|---|---|---|
+| Tailnet IP | 100.87.57.35 | 100.92.64.4 |
+| Role | Chatwoot customer messaging (Docker, own Caddy on 80/443) | Caddy on the host; Uptime Kuma and Nextcloud in Docker; Mautic and Planka stopped |
+| OS | Ubuntu 26.04.1 | Ubuntu 24.04.4 |
+| vCPU / RAM | 2 / 3.7Gi (2.0Gi used) | 2 / 3.7Gi (1.6Gi used) |
+| Free on / | 21G | **11G** |
+| Firewall | ufw active (rules not listed) | ufw **inactive**; Uptime Kuma public on 3001 |
+| Before commissioning | claude NOPASSWD:ALL; root password login allowed | same, plus an extra login user `est`, whom `AllowUsers` will lock out |
+
+Detail: [chatwoot.md](chatwoot.md), [uptime.md](uptime.md).
+
 ## Cross-host findings
 
 1. **Reboots are pending on all three hosts** (`/var/run/reboot-required`, running kernel older than installed). On wp-eu the running kernel is `-28` and `-34` is installed. Nothing to do until someone reboots deliberately.

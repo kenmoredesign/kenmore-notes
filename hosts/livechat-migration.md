@@ -1,5 +1,7 @@
 # Live chat migration: livechat-old to wp-eu
 
+**Closed: livechat-old decommissioned 2026-10-22.** On 2026-10-26 its ssh alias, `livechat` key and known_hosts lines were removed from ops (copies are in `~/backups/2026-10-26-livechat-retire-new-hosts/ssh-pre.tar`).
+
 Revised 2026-10-05 for the decisions of that day (forwarding instead of a database
 link). The 2026-10-02 Gate A plan is in git history. Facts behind it: `livechat-old.md`
 and the 2026-10-02 section of `wp-eu.md`. Scripts: `~/ops/livechat/`.
