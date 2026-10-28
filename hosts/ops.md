@@ -19,6 +19,9 @@ Codex CLI runs as a dedicated service user and generates images with its built-i
   4. run `imagegen probe`, then `imagegen check`.
 - A login can lapse, as matrix's did, and the LB route can't, which is why the repo keeps the LB config as its default.
 
+### Known issue: parallel runs cross outputs (2026-10-28)
+Running several `imagegen generate` at once returned **some images under another run's `--out` name**: 01-03 (all started 15:09:04, one shared run log `20261028-150904.log`) and 13/14 (run logs 151218 and 151219, a second apart). The logged prompts were right and each file was a distinct render, only the labels crossed. Run renders one at a time until the wrapper names run logs and picks the output per run, not per second.
+
 ### What's installed
 - **Service user** `imagegen`: uid 999, gid 983, system user, shell `/usr/sbin/nologin`, home `/var/lib/imagegen` (imagegen:imagegen 750).
 - **Codex CLI** `rust-v0.165.0`, both root:root 755:
