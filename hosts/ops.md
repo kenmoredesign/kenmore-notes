@@ -4,7 +4,7 @@ The Ops box (hostname `Ops`, 188.245.16.25, Hetzner DE), where the Claude Code o
 
 ## Image generation (`imagegen`), 2026-10-28
 
-Codex CLI runs as a dedicated service user and generates images with its built-in `$imagegen` tool. `claude` can only reach it through one wrapper. The files are in ops under `imagegen/` (first commit `f79e762`, v5 `015b6dc`), and the session skill is `.claude/skills/imagegen/SKILL.md`. alex installed it.
+Codex CLI runs as a dedicated service user and generates images with its built-in `$imagegen` tool. `claude` can only reach it through one wrapper. The files are in ops under `imagegen/` (first commit `f79e762`, v5 `015b6dc`, v6 `2489f6e`), and the session skill is `.claude/skills/imagegen/SKILL.md`. alex installed it.
 
 ### Current auth: a ChatGPT login, not Codex LB
 - It **runs on a direct ChatGPT login** in the service user (`/var/lib/imagegen/.codex/auth.json`). The run log of a check on 2026-10-28 shows `provider: openai`, model `gpt-5.6-sol`.
@@ -47,12 +47,13 @@ Codex CLI runs as a dedicated service user and generates images with its built-i
 - Two earlier smoke renders failed:
   - 11:30, "image tool unavailable": the provider/auth eligibility problem;
   - 12:37, "workspace tool host is unavailable": the missing code-mode host.
-- **The installed wrapper is still v1** (8543 bytes, 10:43, from `f79e762`), not v5 from `015b6dc`. The code-mode host and the dir mode changes were done by hand. There's no `/var/backups/kenmore-ops/` either, which means v5's `install.sh` hasn't been run yet. A v5 run would:
-  - install the v5 wrapper, which adds `probe`, makes the LB key optional and adds the `generated_images/` pickup;
+- **The installed wrapper is still v1** (8543 bytes, 10:43, from `f79e762`). The code-mode host and the dir mode changes were done by hand. There's no `/var/backups/kenmore-ops/` either, which means neither v5's nor v6's `install.sh` has been run. A v6 run will:
+  - install the v6 wrapper, which adds `probe` and makes the LB key optional. It also runs the agent with no shell tool, a read-only sandbox and web search off, and moves the generated image into `out/` itself;
   - create `/srv/imagegen/generated_images`;
   - set `log.jsonl` to 664 (it's 660 now);
-  - overwrite `config.toml` with the LB config from the repo. **Before re-running it while still on the ChatGPT login, save the login config, or put it back afterwards.**
+  - **keep the existing `config.toml`**, so the ChatGPT-login config survives. v5 would have overwritten it with the LB config. The LB config is only installed when no config exists.
 - The v1 wrapper still labels its check line "via Codex LB". That's only the label; the auth is the ChatGPT login.
+- **v6 installed:** not yet. Update this line once alex has run v6's `install.sh`.
 
 ### Undo
 ```
@@ -63,6 +64,9 @@ sudo rm -r /srv/imagegen          # outputs + logs; copy out anything you want f
 After that, revoke `OPS-IMAGEGEN` in the LB dashboard and sign the Ops device out of the ChatGPT account. bubblewrap can stay (`apt remove bubblewrap` if not).
 
 ### Open
-- Run v5's `install.sh`, keeping the login config (see above).
+- Run v6's `install.sh` (it keeps the login config).
 - Fix codex-lb's images host model on Jenny, then switch back to the LB.
-- Codex runs as `imagegen` with shell access and reads aren't sandboxed, so a session's prompt could probably get it to copy `auth.json` or `codex-lb.env` into `out/`. I haven't tested this. The sudoers line limits how much a session can spend; it doesn't keep the secret from a session.
+- ~~A session's prompt could get the agent to copy `auth.json` or `codex-lb.env` into `out/`.~~ **Closed in v6** (`2489f6e`), effective once it's installed. The agent runs with `--disable shell_tool`, `-s read-only` and `web_search="disabled"`, so it has no shell to read files with, and the wrapper moves the image itself. Two remaining checks, neither tested:
+  - Codex's read-only sandbox only blocks writes, not reads. So the protection comes entirely from the agent having no tool that can read files.
+  - Codex 0.165.0 still turns on `unified_exec`, `view_image`, `multi_agent`, `apps`, `plugins` and `hooks` by default. Disabling them explicitly would remove any doubt about whether `shell_tool` alone removes `exec_command`.
+  - `--ref` still accepts any absolute path the imagegen user can read. It could be limited to `/srv/imagegen/in/`.
