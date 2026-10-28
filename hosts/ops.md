@@ -31,15 +31,16 @@ Codex CLI runs as a dedicated service user and generates images with its built-i
   - `.codex/auth.json`: the ChatGPT login
   - `codex-lb.env` (600): `CODEX_LB_API_KEY`, only used when the config has `env_key`
 - **Work dirs**, imagegen:claude, setgid:
-  - `/srv/imagegen` with `in/` and `out/` (2775)
+  - `/srv/imagegen` with `in/`, `out/` and `generated_images/` (2775)
   - `.runs/` (2770), one full Codex transcript per run
   - `log.jsonl`, one line per run
   - `.last.txt`
 - **Sudoers** `/etc/sudoers.d/kenmore-imagegen`: `claude ALL=(imagegen) NOPASSWD: /usr/local/lib/kenmore-ops/imagegen`. Confirmed with `sudo -n -l`.
 - **Command**:
   - `/usr/local/bin/imagegen` (shim: `sudo -n -u imagegen …`)
-  - `/usr/local/lib/kenmore-ops/imagegen` (the Python wrapper, root:root 755)
-  - usage: `imagegen check` / `imagegen generate "<prompt>" --out x.png [--size] [--quality low|medium|high] [--ref] [--transparent] [--force]`. v5 adds `imagegen probe`.
+  - `/usr/local/lib/kenmore-ops/imagegen` (the Python wrapper, v7, root:root 755)
+  - usage: `imagegen check` / `imagegen probe` / `imagegen generate "<prompt>" --out x.png [--size] [--quality low|medium|high] [--ref] [--transparent] [--force]`
+  - `probe` is only for LB mode: it calls the LB's images route directly.
 
 ### State on 2026-10-28 (checked 12:49 UTC)
 - `imagegen check` **from a Claude session: OK** (rc 0, reply `OK`, 3s).
@@ -47,13 +48,17 @@ Codex CLI runs as a dedicated service user and generates images with its built-i
 - Two earlier smoke renders failed:
   - 11:30, "image tool unavailable": the provider/auth eligibility problem;
   - 12:37, "workspace tool host is unavailable": the missing code-mode host.
-- **The installed wrapper is still v1** (8543 bytes, 10:43, from `f79e762`). The code-mode host and the dir mode changes were done by hand. There's no `/var/backups/kenmore-ops/` either, which means none of the v5–v7 `install.sh` versions has been run. A v7 run will:
-  - install the v7 wrapper, which adds `probe` and makes the LB key optional. It also runs the agent with no tools except the image tool (see Open), accepts `--ref` only from `/srv/imagegen/in/`, and moves the generated image into `out/` itself;
-  - create `/srv/imagegen/generated_images`;
-  - set `log.jsonl` to 664 (it's 660 now);
-  - **keep the existing `config.toml`**, so the ChatGPT-login config survives. v5 would have overwritten it with the LB config. The LB config is only installed when no config exists.
-- The v1 wrapper still labels its check line "via Codex LB". That's only the label; the auth is the ChatGPT login.
-- **v7 installed:** not yet. Update this line once alex has run v7's `install.sh`.
+- Until 14:05 the installed wrapper was v1 (from `f79e762`), and the code-mode host and dir modes had been set by hand.
+
+### v7 installed, 2026-10-28 14:05 UTC
+- alex ran v7's `install.sh`. Backup: `/var/backups/kenmore-ops/imagegen-20261028-140509`.
+- The installed `/usr/local/lib/kenmore-ops/imagegen` matches `b0c3d4a` (13849 bytes).
+- The existing `config.toml` was kept, so it's still on the ChatGPT login.
+- `/srv/imagegen/generated_images` (2775) was created, and `log.jsonl` is now 664.
+- The agent runs with no tools except the image tool, and `--ref` is accepted only from `/srv/imagegen/in/`.
+- **Smoke render at 14:06:** `/srv/imagegen/out/smoke-v7.png` (low quality, 28s). The agent replied with the tool's path under `/var/lib/imagegen/.codex/generated_images/<session>/`, and the wrapper moved the file into `out/`.
+- **`imagegen check` from a Claude session at 14:09: OK.** It reports the ChatGPT login (`auth.json` present), the code-mode host and bwrap, and the round-trip took 3s.
+- Moved images keep group `imagegen` (`smoke-v7.png` is imagegen:imagegen 664), because a renamed file doesn't pick up the setgid group of `out/`. `claude` can read, rename and delete them but can't overwrite them in place. To fix it, have the wrapper copy and then delete instead of moving, so the new file inherits group `claude`.
 
 ### Undo
 ```
@@ -64,9 +69,8 @@ sudo rm -r /srv/imagegen          # outputs + logs; copy out anything you want f
 After that, revoke `OPS-IMAGEGEN` in the LB dashboard and sign the Ops device out of the ChatGPT account. bubblewrap can stay (`apt remove bubblewrap` if not).
 
 ### Open
-- Run v7's `install.sh` (it keeps the login config).
 - Fix codex-lb's images host model on Jenny, then switch back to the LB.
-- ~~A session's prompt could get the agent to copy `auth.json` or `codex-lb.env` into `out/`.~~ **Closed in v6** (`2489f6e`), effective once it's installed. The agent runs with `--disable shell_tool`, `-s read-only` and `web_search="disabled"`, and the wrapper moves the image itself.
+- ~~A session's prompt could get the agent to copy `auth.json` or `codex-lb.env` into `out/`.~~ **Closed in v6** (`2489f6e`); in effect since the v7 install. The agent runs with `--disable shell_tool`, `-s read-only` and `web_search="disabled"`, and the wrapper moves the image itself.
 - ~~Default-on agent tools beyond the shell.~~ **Closed in v7** (`b0c3d4a`). The wrapper also disables `unified_exec`, `view_image`, `multi_agent`, `apps`, `plugins` and `hooks`. alex verified on codex 0.165.0 that `shell_tool` alone already removes `exec_command`. The remaining nested tools are the image tool, `apply_patch` (model-authored text only), goals and MCP resource listing with no servers configured.
 - ~~`--ref` accepts any path the imagegen user can read.~~ **Closed in v7** (`b0c3d4a`). Its realpath must be under `/srv/imagegen/in/`.
 - Smaller, untested: `in/` is writable by `claude`, and the wrapper checks the ref's realpath but passes the unresolved path to `codex -i`. A session could swap a checked file for a symlink to `auth.json` between the check and Codex reading it. Codex's image loader would most likely reject the file. To close it, copy each ref into a private temp file (opened with `O_NOFOLLOW`) after the check and pass that copy.
