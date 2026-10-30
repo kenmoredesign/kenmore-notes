@@ -316,3 +316,17 @@ No separate notes checkout was found.
 - kenmore-translate re-queues all languages on **any** save of a source page (publish to publish too) when
   md5(title|content|excerpt) differs from `_kt_source_hash`. After patching translations by hand, set the hash.
   Details: ~/ops/wordpress/agentic-forex-crm/mobile/ROLLBACK.md.
+
+### kdsites deploy guard and record (2026-10-30)
+- The deploy guard stopped on 2026-10-30 09:55 on live-only changes since the 23 Oct refresh record: 802 files,
+  all auto-updates (core 7.0.8 on 28 Oct, core and plugin language packs, wp-content/upgrade/index.php), all
+  byte-identical on dev; core, plugin and language versions equal on both. `claude` cannot read
+  /var/backups/kenmore-ops/kdsites (refresh records, deploy work dirs, logs): root only.
+- Neither script could refresh the record alone (deploy: `[--run]` only, record written in its step 6;
+  refresh-dev-from-live.sh rewrites the record but wipes dev). Draft `deploy-dev-to-live.sh --refresh-record [--run]`
+  and an updated readme.txt in /srv/incoming/kenmoredesign/review/deploy-refresh-record-2026-10-30/, not installed.
+- dev has mu-plugin wp-content/mu-plugins/kd-no-translation-autoupdate.php (filter auto_update_translation false):
+  no language-pack auto-updates. Live's copy is Alex's to add; the deploy mirror would delete a live-only copy.
+  Core auto-updates stay on, so a security release can still stop the guard.
+- A `refresh-dev-from-live.sh --run` started 09:55 was cancelled at step 2 (dev backup zip); its handler left dev
+  unmodified, out of maintenance, cron entry back.
