@@ -324,12 +324,34 @@ No separate notes checkout was found.
   /var/backups/kenmore-ops/kdsites (refresh records, deploy work dirs, logs): root only.
 - Neither script could refresh the record alone (deploy: `[--run]` only, record written in its step 6;
   refresh-dev-from-live.sh rewrites the record but wipes dev). Draft `deploy-dev-to-live.sh --refresh-record [--run]`
-  and an updated readme.txt in /srv/incoming/kenmoredesign/review/deploy-refresh-record-2026-10-30/, not installed.
+  and an updated readme.txt in /srv/incoming/kenmoredesign/review/deploy-refresh-record-2026-10-30/; both were
+  installed on kd-site 2026-10-30 10:27 UTC (corrected 2026-11-02; this line used to say "not installed").
 - dev has mu-plugin wp-content/mu-plugins/kd-no-translation-autoupdate.php (filter auto_update_translation false):
   no language-pack auto-updates. Live's copy is Alex's to add; the deploy mirror would delete a live-only copy.
   Core auto-updates stay on, so a security release can still stop the guard.
 - A `refresh-dev-from-live.sh --run` started 09:55 was cancelled at step 2 (dev backup zip); its handler left dev
   unmodified, out of maintenance, cron entry back.
+- **2026-11-02: script drift.** kd-site's `deploy-dev-to-live.sh` (with `--refresh-record`) had not reached the ops
+  repo; ops now matches the host byte for byte (ops 60e1ebd, sha256 a3a08676…). The host's `readme.txt` (same
+  10-30 change: "IF THE GUARD STOPS" steps) still differs from ops `kdsites/readme.txt`, and
+  `deploy-dev-to-live.dry-run.txt` in ops predates the flag (regenerating it needs root). `refresh-dev-from-live.sh`
+  and `restore-live-settings.sh` match. Compare sha256 host vs ops before relying on the ops copy.
+- **2026-11-02: a deploy rewrites the record in place.** Step 6 updates the record dir named in `last-refresh`, so
+  `refresh-record-2026-10-23_120724` held the state after the 2026-10-30 deploy (live has dev's 10-30 pages), not
+  the 23 Oct one. The guard's terms line is three bare counts (terms, term_taxonomy, term_relationships); postmeta
+  and options are not checked at all.
+- **2026-11-02: guard stop, `terms 489 489 7455 -> 7456`. An auto-draft on www trips it.** Opening Posts > Add New
+  creates an `auto-draft` row (excluded from the guard's posts line) and Polylang immediately gives it the default
+  language, a `wp_term_relationships` row (term_taxonomy 102, `language` `en`) that the terms count does see. Here:
+  live object 19814, auto-draft by `denis` (title "Черновик", ru_RU), 2026-10-30 10:57:56 UTC, empty, no meta;
+  core's daily `wp_delete_auto_drafts` removes it once it is 7 days old (first run after 2026-11-06 10:57), which
+  moves the count back and trips the guard the other way. Do not copy such a row to dev: IDs collide (dev's 19814
+  is a revision of fr 18954). Alex decided to accept the difference: `deploy-dev-to-live.sh --refresh-record` (dry
+  run, check the only db line is the terms count and there are no file lines), then `--run`, then deploy.
+  `denis` also opened the KPI post 18933 editor on **www** 2026-11-02 19:29 UTC (edit lock only, no save). Edit locks
+  are postmeta, so the guard misses them. Live is readable with `sudo /usr/local/lib/kenmore-ops/wp site db query`
+  (SELECT only); diff live vs dev postmeta with dev's values `REPLACE`d dev.->www. (same length, so serialized
+  values stay valid), SQL sent on stdin to avoid quoting errors.
 - **2026-11-02:** contact forms and SendPulse (read on dev). Every lead form (the `/contact-us/` page form and the `#contacts-modal`…`modal5` popups) posts `action=send_message` to admin-ajax, handled by `send_message()` in sage `app/actions.php`, the only SendPulse code in wp-content (CF7 is not involved). Each POST is logged in `leadlog_<db name>` first. The lead owner was `SENDPULSE_RESPONSIBLE_ID` from wp-config.php (client id/secret are still read from there). On dev it is now the theme constant `KD_SENDPULSE_RESPONSIBLE_ID` = 9387762 (Alex), because the deploy keeps live's wp-config.php. www still uses the wp-config value until the next deploy. Job folder: ops `wordpress/fix-contact-sendpulse-kpi/`.
 - **2026-11-02:** the contact page's WhatsApp button is ACF repeater `social` (`social_0_link`) on page 7 and on each of its 11 translations, not a theme string. Changed on dev from `wa.me/16173814194` to `wa.me/16178580644` (the number it had before, per page 7's revisions). Row 1 (`social_1_link`) is Telegram, changed on dev the same day from `t.me/KenmoreDesignLLC` to `t.me/KenmoreDesign`. The agent guide was brought in line the same day (v1.2, below).
 - **2026-11-02:** "translation not showing" on posts from 2026-07/08 is usually suffixed slugs, not missing Polylang links: the switcher goes to `/<lang>/<english path>/`, which 301s to English when the translation is `…-8`. Still suffixed on dev: 18931, 18932, 18588 (all 11 each), and single ones on 3100, 2362, 2300. Orphan non-en posts outside any group: 18964 (ko duplicate of 19003), 18699 fr, 18693 ku. Group of pages 19017/19018/19019 holds three `en` posts. User `denis` was renaming KPI slugs by hand in wp-admin on dev the same day.
