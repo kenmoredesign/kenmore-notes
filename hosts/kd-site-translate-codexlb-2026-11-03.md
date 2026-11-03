@@ -74,3 +74,27 @@ live's Provider on `codexlb` and copy the codex-lb key. If live's plugin is stil
 1.7.37, it would treat `codexlb` as DeepSeek and send the OpenAI key to DeepSeek. Also, codex-lb is
 reachable only over the tailnet; www is on the same host, so it would reach it too. Decide
 before deploying: set dev back to openai, or ship 1.7.38 with it on purpose.
+
+## First real run on codex-lb (2026-11-03 23:19–23:33 UTC)
+Alex: no full run, only these pages. 19 `kt_translate_post` jobs, created and run by ID
+one at a time (376979–376997): 1733 /demo/ × 11 languages, and 18933's 8 earlier
+OpenAI-429 failures (ru tr zh ko ja ku ar fa; its fr es he had gone through before).
+**0 failed, 828 s total**: 1733 jobs ~6 s each, 18933 jobs 73–128 s each. No
+`_kt_error_*` left on either source; all slugs shared (`demo`, the KPI slug), no `-N`.
+Backups of the 19 overwritten translations + both sources (post + meta JSON):
+Ops `~/agent-guide/backup/kt-codexlb-20261103-2258/run-1733-18933/`.
+
+- All 11 /demo/ translations now carry 1733's Custom HTML embed: `.kd-calendly`,
+  `utm_source=kd-demo-page` on the `data-url`, no `[schedule]`. The Calendly webhook
+  tags /demo/ bookings by that utm (`KD_CALENDLY_DEMO_UTM_SOURCE`, `kd_calendly_parse()`),
+  **not by post ID**, so translated copies now get leadlog + lead email too. Verified
+  as far as the iframe `src` (the tag reaches Calendly on /fr/ and /he/); no real
+  booking made (it would create a SendPulse contact and email).
+- Embed fit (`ops wordpress/kenmore-translate-codexlb/test-demo-embed.js`, calendar →
+  times → details, never Schedule Event), /fr/demo/ and /he/demo/ identical to /demo/:
+  1440 = 1160×800 frame, document 800; 390 = auto-resize 1056/1063/1112, document equals
+  frame. No ancestor scrolls or clips. Only scroller: Calendly's own time-slot list at
+  1440 on the times step (777/569), same on English. he is `dir=rtl` around an LTR
+  Calendly; Calendly's UI stays English on every language.
+- KPI 18933 ru and ar screenshotted at 1440/390 (ar RTL), text sampled on all 8.
+- Screenshots: `/srv/incoming/kenmoredesign/review/kt-codexlb-20261103/`.
