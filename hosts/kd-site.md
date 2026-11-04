@@ -372,3 +372,9 @@ No separate notes checkout was found.
   - **WP Rocket's minified JS copies (`cache/min/1/…`) are made once and never refreshed when the source changes:** dev's cached pages still load the 2026-10-29 `actions.js`. Clear all of WP Rocket's cache after any theme JS change (dev and, after the deploy, www). `claude` cannot write WP Rocket's cache dirs.
   - `wp eval` is refused by the wrapper. `leadlog_kenmore_dev` columns are id, created_at, status, sp_contact_id, sp_error, ip, country, user_agent, payload (readable with `wp dev db query`).
   - TEST: leadlog 47–51, SendPulse 44522290/318/428/432/435. Ops `wordpress/intl-tel/`.
+- **2026-11-04 afternoon (dev only):**
+  - Calendly fixes 5 ("Loading calendar…" cover) and 4 (direct iframe on /demo/) were reverted at Alex's request. /demo/ (1733) and its 11 translations are back on the Phase 3 widget.js embed; fix 3 (popup warm-up) stays. The 11 jobs (377016–377026) ran on codex-lb in about 3 minutes, so the queue is much faster than the 2026-10-23 rate of about one job per 5-minute tick.
+  - The theme's `main.css` raises every `.form-field .input-field` placeholder from opacity .3 to 1 on `:focus`, so an example number reads like a typed value. The phone field overrides this (`.kd-iti input[name=im]:focus::placeholder{opacity:.3}`, inline CSS in the setup.php block).
+  - The `im_type` bug is fixed in `actions.js`: only `.fake-select button.option[data-type]` sets it.
+  - `ssh -T git@github.com` is always denied here (no key for the bare host). The notes remote goes through the `github-notes` alias with `~/.ssh/gh-notes`, a deploy key on kenmore-notes. A push denied at 11:16 UTC worked again by 14:38 with no local change.
+  - Ops `wordpress/calendly/REPORT-followup.md`.
