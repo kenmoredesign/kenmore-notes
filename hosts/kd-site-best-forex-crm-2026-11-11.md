@@ -43,3 +43,23 @@ Dev only (dev.kenmoredesign.com). Nothing on www; deploy-dev-to-live.sh not run.
   highlighted), canonical/JSON-LD URLs become www through the deploy's search-replace.
 - Any editor save of 19999/20000 while `kt_auto`=1 queues 11 languages (no `_kt_source_hash`); re-save with the job's
   `tools/update.sh`, or translate deliberately.
+
+## Blog index and featured images (follow-up, 2026-11-11 23:50–23:58 UTC, dev only)
+
+- **dev /blog/ (page 23) has no featuring mechanism.** "Featured Posts" is a Getwid `getwid/recent-posts` block in page 23's
+  content: post type `post` only, newest first, `ignore_sticky_posts`=1 (sticky is ignored), 100 posts, 2 columns, `medium`
+  thumbnail uncropped (300×200), `<img alt>` = post title (not the attachment alt), text = excerpt cut to 17 words + "…".
+  The sidebar "Recent Posts" is a second Getwid block (5 titles). `sticky_posts` is empty; `page_for_posts` 0.
+- **Page 19999 shown first anyway (Alex's choice):** page 23 content now wraps a static card (Getwid card markup copied,
+  hero 19994 medium size, 17-word description from the excerpt's first sentence) and the dynamic block in one group
+  `.kd-blogfeat`; a scoped `<style>` makes the group the flex container and both inner wrappers `display:contents`, so the
+  card flows in the same grid. Saved under the kt_auto guard; page 23's `_kt_source_hash` is now stale, so an editor save
+  of page 23 queues 11 languages. Its 11 translations still have the old content. Revert: ops
+  `wordpress/best-forex-crm/blog-featured/tools/save23.sh backup/page23-content-before.exact.html`.
+- **Featured images replaced on the English posts:** 19919 19922→20007, 19918 19921→20008, 19917 19920→20009
+  (imagegen medium, 1000×667 JPG). 19921 and 19922 were byte-identical files, so the breach and permissions posts had
+  shown the same picture. Old images were used only as featured images (EN + 11 translations each, 33 translation posts
+  still on the old ones), not in post bodies, options or Yoast social-image overrides.
+- **`post meta update _thumbnail_id` alone leaves og:image stale** (Yoast indexable) and WP Rocket's cached post page
+  stale; a guarded no-change `post update ID --post_status=publish` refreshes both (posts' post_modified becomes 23:57).
+- Ops resize to JPG: `blog-featured/tools/resize.js` (canvas, quality 0.9).
