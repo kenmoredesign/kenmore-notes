@@ -63,3 +63,20 @@ Dev only (dev.kenmoredesign.com). Nothing on www; deploy-dev-to-live.sh not run.
 - **`post meta update _thumbnail_id` alone leaves og:image stale** (Yoast indexable) and WP Rocket's cached post page
   stale; a guarded no-change `post update ID --post_status=publish` refreshes both (posts' post_modified becomes 23:57).
 - Ops resize to JPG: `blog-featured/tools/resize.js` (canvas, quality 0.9).
+
+## Rebuilt as a blog post (2026-11-12 16:20–16:50 UTC, dev only)
+
+- **Post 20045** `https://dev.kenmoredesign.com/2026/11/12/best-forex-crm-providers/` (author alex, All About Forex, en)
+  replaces page 19999; **19999 and 20000 trashed**. Hero 20046 (1600×704, featured), vendor screenshots 20047–20056
+  (WebP 1200×675). Job folder ops `wordpress/best-forex-crm/blog-post/` (README has rebuild and undo).
+- **dev has no way to add a redirect through the wrapper:** the active Redirection plugin (`redirect-redirection`, Inisev)
+  stores rules in `wp_irrp_redirections` and adds them only via wp-admin AJAX. With the page trashed, WordPress core's
+  404 slug guess 301s `/best-forex-crm-providers/` to the dated post (`x-redirect-by: WordPress`); `/…/methodology/` is
+  a 404. Alex chose core-only.
+- `wp dev db search '<text>' --all-tables` works through the wrapper (read-only, via wpdb) and is the way to "grep the DB".
+- **kenmore-translate ran FR for page 23 at 10:07 UTC (queued 08:14, also 19917 in 11 languages, outside our sessions)**
+  and copied the static /blog/ card into fr page 11146. Card removed from 23 (exact original bytes) and 11146 (card block
+  only) since the post now heads the Getwid grid by itself.
+- Blog single template: H1 + "By Alex | category | date", no featured image in the body, no TOC on any recent post.
+  A wide (1600×704) featured image gives a 300×132 card on /blog/ next to 300×200 cards (Getwid uncropped `medium`).
+- `post update <id> <file>` reads content from a file; Yoast og:image follows `_thumbnail_id` after a guarded no-op save.
