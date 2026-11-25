@@ -441,6 +441,14 @@ No separate notes checkout was found.
   `template-solutions`): wide cards are repeater `kinds_1`, printed as `#item2-N`; AI card row 0, Mobile App row 1,
   ordered by flex `order` on `#cards > .container`. To add a card above another, append a row and reorder with CSS;
   do not insert, the scoped CSS targets the ids.
-- Theme gotcha: `.tpg ul li { align-items:center }` reaches into custom list-based cards inside page content.
+- 2026-11-25 (root window): nginx `location ~* \.apk$` (type `application/vnd.android.package-archive`, attachment)
+  added before the static-assets location in `sites-available/dev` and `000-default` (www server block); backups
+  `/root/nginx-bak-{dev,000-default}-20261125-143216`. Cloudflare still caches the bare APK URL as octet-stream, so
+  both pages link `kenmore-mobile-demo.apk?v=2`.
+- 2026-11-25: "Prop Firm API" (item 5489) removed from menu 71 (prop icon row) at Al's request: 12 items made the
+  labels wrap to three lines. Re-create commands in ops `wordpress/prop-firm-mobile-app/CHANGES.md`. Shared
+  `kma.css`/`kma.js` are at `?v=9`.
+- Naming (Al, 2026-11-25): the forex client area is always "Trader's Room"; the prop one is the Prop (Firm) Dashboard.
+- Theme gotcha: `.tick-list,.tpg ul { align-items:flex-start }` stops grid children stretching; and `.tpg ul li { align-items:center }` reaches into custom list-based cards inside page content.
 - YourProp demo captures: the capture agent's "full-length" stitch can silently fall back to one screen
   (2205 px). Ask it to report pixel heights.
