@@ -452,7 +452,7 @@ No separate notes checkout was found.
   service rows; desktop SVG animation unchanged). RTL fixes for ar/fa/he in the shared files: `.kma-screen`/`.kma-dots`
   forced `direction:ltr` (pattern B's track slid out of the phone), eco curves assigned by on-screen order, and
   `html[dir="rtl"]` overrides because the theme's `[dir="rtl"] .wrap-content ul li{padding-right:1.8em}` reaches into
-  list-based cards. Shared `kma.css`/`kma.js` are at `?v=12`. Cloudflare caches them for 10 years per URL, so a fix
+  list-based cards. Shared `kma.css`/`kma.js` were at `?v=12` after this (now v13, below). Cloudflare caches them for 10 years per URL, so a fix
   reaches a page only through a new `?v=`, and translated pages only after their translation jobs are re-run.
 - **kenmore-translate skips any block that contains `application/ld+json`** (`is_protected_block()`), reports success
   and sets the hash. A page stored as one `wp:html` block with its FAQPage JSON-LD inside comes out with a translated
@@ -464,8 +464,18 @@ No separate notes checkout was found.
   "Mobile App" added to `kt_theme_strings` and translated as one string (`kt_string_i18n` 147 → 148 keys); method and
   log in ops `wordpress/mobile-app-translations/`. A guarded save can still queue jobs if the guard is not in place:
   check pending jobs after every save while a run is going.
-- Translated prop pages show the **forex** icon row, not menu 71: the template picks "Prop Firm Navigation" from the
-  body class `parent-pageid-4268`, and translated hubs have other IDs. Existing behaviour, not fixed.
+- Translated prop pages used to show the **forex** icon row (the views test `parent-pageid-4268`/`page-id-4268`, and
+  translated hubs have other IDs; www still does this until the next deploy). Fixed on dev 2026-11-25 in the theme:
+  `sage/app/filters.php` has a `body_class` filter that adds the English counterpart's `page-id-4268` /
+  `parent-pageid-{4268,6846,7283}` class on translated pages and a `nav_menu_css_class` filter for the current item;
+  `app/walker.php:130` compares with the English ID. Backups and undo: ops `wordpress/prop-firm-mobile-app/`
+  (`backup/theme-f5/`, CHANGES.md "Fixes 5"). After the deploy, purge WP Rocket for translated prop paths on www.
+- kma v13 (2026-11-25): `.wrapper:has(.kma){overflow-y:clip}`; v5's `overflow:visible` (needed for sticky pinning) let
+  the theme's footer leaf (`.footer:after`, `bottom:-100px` under 992 px) add a 100 px white band on phones. v12 → v13
+  reached 20276 and the 22 translations by a DB-level `search-replace` of the two asset URLs, not by translation jobs,
+  so `_kt_source_hash` of 20266 and 20276 is stale: the next unguarded save of either queues 11 jobs.
+- `claude` cannot delete WP Rocket cache files (www-data, 2755) and the wp wrapper has no `rocket` command; a no-op
+  `post update <ID> --post_status=publish` (under the kt_auto guard for English posts) clears that post's cache.
 - 2026-11-25 blog posts: 20045 (best forex CRM) Kenmore Design mobile cell "iOS, Android", score 91.88 → 96.88, dated
   update sentence, two source links; the local build sources in ops `wordpress/best-forex-crm/` still say 91.88, so a
   rebuild would revert it. 20069 (best prop firm CRM): "93.00 on site statements alone"/"Kenmore-confirmed" wording
