@@ -430,8 +430,17 @@ No separate notes checkout was found.
   widgets `custom_html-4` (left) and `custom_html-5` (right).
 - 5118 Prop Firm Dashboard (`template-traders-room`) and 5115 Prop Firm CRM (`template-forex-crm`) are ACF-driven
   and do not print post_content.
-- Menu entry "Mobile App" for the prop side was NOT added on 2026-11-25: the sandboxed builder's permission
-  classifier refused `wp menu item add-post` / `option patch update widget_custom_html` twice. Prepared script:
-  ops `wordpress/prop-firm-mobile-app/tools/remote/menus.sh`.
+- Menu entry "Mobile App" for the prop side: added 2026-11-25 (later the same day, after Al asked for it): item 20281
+  in menu 71 at position 5, plus widgets `custom_html-4`/`-5`. 12 items fit the icon row in one line at >=1200 px;
+  below that the row scrolls sideways, as it did with 11.
+- 2026-11-25 round "owner-facing rewrite" on both mobile app pages: shared `uploads/forex-mobile-app/kma.css`/`kma.js`
+  are at `?v=7` (benefit cards, ecosystem diagram, hybrid card, art beside every phone); both pages load them.
+- Hub promo cards (2026-11-25): `/forex-solutions/` (page 10) keeps cards in ACF repeater `kinds`, printed as
+  `#item-N`; the AI Agents card is row 4 with a scoped `<style>` in its description that sets flex `order`. The
+  Mobile App card was appended as row 5 with `order:0`, so no id shifted. `/prop-firm-solutions/` (4268,
+  `template-solutions`): wide cards are repeater `kinds_1`, printed as `#item2-N`; AI card row 0, Mobile App row 1,
+  ordered by flex `order` on `#cards > .container`. To add a card above another, append a row and reorder with CSS;
+  do not insert, the scoped CSS targets the ids.
+- Theme gotcha: `.tpg ul li { align-items:center }` reaches into custom list-based cards inside page content.
 - YourProp demo captures: the capture agent's "full-length" stitch can silently fall back to one screen
   (2205 px). Ask it to report pixel heights.
