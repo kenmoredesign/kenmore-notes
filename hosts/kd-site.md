@@ -470,6 +470,16 @@ No separate notes checkout was found.
   `parent-pageid-{4268,6846,7283}` class on translated pages and a `nav_menu_css_class` filter for the current item;
   `app/walker.php:130` compares with the English ID. Backups and undo: ops `wordpress/prop-firm-mobile-app/`
   (`backup/theme-f5/`, CHANGES.md "Fixes 5"). After the deploy, purge WP Rocket for translated prop paths on www.
+  That part went to www with the deploy of 2026-11-25 (checked in a browser). Correction: the current-item filter is
+  `wp_nav_menu_objects`, not `nav_menu_css_class`.
+- Forex icon row (menu 4 "Navigation", walker `magomra_walker_nav_menu2`, which also prints the API and Partners
+  rows): translated forex pages marked no current item, and translated forex hubs linked to subpages instead of the
+  hub anchors. Fixed **on dev only** 2026-11-25 after that deploy (www still has it until the next one): the
+  `wp_nav_menu_objects` filter in `sage/app/filters.php` also runs for walker2 + menu term 4, and
+  `app/walker.php:68` compares hub ID 10 with the English ID. Backups and undo: ops
+  `wordpress/icon-row-current-forex/`. After the next deploy, purge WP Rocket for `/<lang>/forex-solutions/` on www.
+  Still open (old): translated children of `forex-api-for-developers` (821) print the forex row instead of the API
+  row (`parent-pageid-821` missing on translations), and translated 821 marks no current item in the API row.
 - kma v13 (2026-11-25): `.wrapper:has(.kma){overflow-y:clip}`; v5's `overflow:visible` (needed for sticky pinning) let
   the theme's footer leaf (`.footer:after`, `bottom:-100px` under 992 px) add a 100 px white band on phones. v12 → v13
   reached 20276 and the 22 translations by a DB-level `search-replace` of the two asset URLs, not by translation jobs,
