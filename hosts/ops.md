@@ -100,15 +100,29 @@ data for kenmoredesign.com. All four were live-tested on 2026-11-26.
 
 ## Sandboxed agents and the SEO plugin (2026-11-26)
 
-An `agent-run` terminal has no plugins, no `~/.config/claude-seo` keys, no PostHog MCP server and no Playwright
-browser (none of those paths are mounted). For the kenmoredesign.com SEO audit the arrangement was:
-- the orchestrator session pulls Search Console, GA4, CrUX, PSI and PostHog data into the job folder (`data/`);
-  the sandboxed agent asks for more through a `REQUESTS.md` file. Keys never enter the sandbox.
-- the plugin is loaded from a copy in the job folder: `claude --plugin-dir <job>/tools/claude-seo` (copy of
-  `~/.claude/plugins/cache/agricidaniel-claude-seo/claude-seo/<version>`).
-- a browser works inside bubblewrap from copies of `~/.cache/ms-playwright` and `~/ops/tools/node_modules` in the
-  job folder, with `PLAYWRIGHT_BROWSERS_PATH=<job>/tools/ms-playwright` (checked: headless Chromium loads www).
-  `tools/` is 690 MB and git-ignored in the job folder.
-- `--permission-mode auto` so the agent is not stopped at every command. It cannot `hc send` (no hc inside): it
-  reports through a status file, and the orchestrator reads its screen with `hc read`.
-Run `agent-sandbox --job <dir> -- bash -c '<probe>'` from your own shell to test what the sandbox can do.
+**Use `agent-run --profile seo`.** A Herdr terminal started with `tools/agent-run` in the default or `ssh` profile
+has no plugins, no `~/.config/claude-seo` keys, no PostHog MCP server and no browser: none of those paths are mounted.
+That is why an SEO session started that way cannot reach Google or PostHog. (On 2026-11-24 Alex chose to run SEO
+audits himself in a normal tab, and the sandboxed variant was not built; the 2026-11-26 connection note above only
+covers normal sessions.)
+
+Since 2026-11-26 15:00 UTC `tools/agent-sandbox` has an opt-in profile `seo` (Alex approved it, including the Chromium
+setting). It adds, read-only:
+- the installed plugin (newest version under `~/.claude/plugins/cache/agricidaniel-claude-seo/claude-seo/`) at `~/claude-seo`;
+- `~/.local/share/claude-seo` (its Python venv and Chromium) and `~/.config/claude-seo` (service account, API key);
+- the `posthog` entry of `~/.claude.json` in the per-run `~/.claude.json`;
+- `CLAUDE_SEO_CHROMIUM_REQUIRE_SANDBOX=0` in the environment and in the per-run copy of `settings.json`: Chromium's own
+  sandbox cannot start inside bubblewrap, and the host setting (`1`, unchanged) makes the plugin refuse to render
+  without it. Inside the profile bubblewrap is the containment.
+An agent in this profile can read the Google service-account key and the PostHog key (both read-only). No ssh.
+
+Launch: `agent-run --profile seo --job <dir> --name <n> -- claude --model <m> --permission-mode auto --plugin-dir
+~/claude-seo "<task>"`. Without `--plugin-dir` the skills are not loaded. Checked inside the profile: 29 claude-seo
+skills in a Claude run, `claude-seo run google_auth.py --check` all OK, live `gsc_query.py` and `ga4_report.py`, CrUX,
+a PostHog `execute-sql` through the MCP server, and `render_page.py` (playwright-chromium). Probe again with
+`tools/agent-sandbox --profile seo --job <dir> -- bash -c '~/claude-seo/scripts/claude-seo run google_auth.py --check'`.
+The agent cannot `hc send` (no hc inside): have it report through a status file and read its screen with `hc read`.
+
+Before the profile existed (the first hours of the 2026-11-26 audit) the workaround was: orchestrator exports the
+Google and PostHog data into the job folder, plugin loaded from a copy with `--plugin-dir <job>/tools/claude-seo`,
+Playwright and Chromium copied into the job folder with `PLAYWRIGHT_BROWSERS_PATH`. Not needed any more.
