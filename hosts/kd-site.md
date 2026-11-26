@@ -543,3 +543,27 @@ No separate notes checkout was found.
   Any new `location` with its own `add_header` in this vhost must repeat the X-Robots-Tag line.
   Undo: `ssh root@kd-site 'cat /root/nginx-bak-dev-20261126-143804 > /etc/nginx/sites-available/dev && nginx -t && systemctl reload nginx'`.
   The deploy script named in Alex's "make sure not to run that script" was `deploy-dev-to-live.sh`; it was only read, never run.
+
+### 2026-11-26: SEO audit of www finished (read-only), facts worth keeping
+
+Report: ops `wordpress/seo-2026-11/audit/out/AUDIT.md`; plan waiting for Alex: `wordpress/seo-2026-11/PLAN.md`.
+Nothing was changed on www or dev by the audit.
+
+- **WP Rocket page cache is only served with the `pll_language` cookie** (or a user agent containing `Google`,
+  `Chrome-Lighthouse`, `WP Rocket/Preload`), on www and dev alike. `wp-content/wp-rocket-config/<host>.php` line 93:
+  `$rocket_cache_mandatory_cookies = 'pll_language';`. WP Rocket adds it itself while Polylang's "Detect browser
+  language" (`polylang` option, `browser`) is on (`wp-rocket/inc/3rd-party/plugins/i18n/polylang.php`), and rewrites the
+  config when that option changes. First visits, Bing and AI crawlers therefore get uncached PHP without minify, defer
+  or lazy loading (first byte 0.59 s against 0.13 s; translations 1.15 s). PageSpeed tests the cached variant.
+- **Cached pages freeze lead-form values.** `sage/app/setup.php:80` prints `country` (from `HTTP_CF_IPCOUNTRY`),
+  `firstPage`, `refSite` into the page and `:136-151` sets the `firstPage`/`refSite` cookies in PHP; `actions.js`
+  sends them with each lead to admin-ajax. The cached www home page carried `"country":"DE"` on 2026-11-26.
+- **`robots.txt` on www is a plain file in the webroot** (dated 2026-11-07) and is in the deploy's PRESERVE list, as are
+  `.htaccess` and `wp-content/advanced-cache.php`; `wp-content/wp-rocket-config/` is not synced either. A robots.txt or
+  WP Rocket config change never reaches www through a deploy. It disallows `/wp-content/cache/`, `/wp-includes/` and
+  `/*?*`, which covers most CSS and JS of the cached page.
+- **CRM pages:** the inline `kd:selffit-line` script in `sage/resources/views/template-forex-crm.blade.php:165-304`
+  blocks desktop browsers (≥1240 px) for 3.7 to 4.1 s on load (`samples()`, 3,756 `getPointAtLength` calls).
+- **Side effects of the audit on www:** one WP Rocket cache file written for `/fr/forex-solutions/forex-crm/`, about
+  100 anonymous visitor records in Chatwoot from browser loads, one home-page load with analytics beacons allowed.
+- kd-site disk on 2026-11-26: 11 GB free of 75 GB (86%); a full dev backup is 2.7 GB.
