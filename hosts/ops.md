@@ -126,3 +126,10 @@ The agent cannot `hc send` (no hc inside): have it report through a status file 
 Before the profile existed (the first hours of the 2026-11-26 audit) the workaround was: orchestrator exports the
 Google and PostHog data into the job folder, plugin loaded from a copy with `--plugin-dir <job>/tools/claude-seo`,
 Playwright and Chromium copied into the job folder with `PLAYWRIGHT_BROWSERS_PATH`. Not needed any more.
+
+### imagegen: `--ref` is broken (seen 2026-11-26)
+`imagegen generate "<prompt>" --ref <file> …` fails at once (`codex_rc` 1, no file): the run log shows
+`codex exec … -i <ref> -i <ref> '$imagegen …'` followed by "Reading prompt from stdin... No prompt provided via stdin."
+Codex's `-i` takes several values and swallows the prompt argument that follows it. Without `--ref` the same prompt
+renders normally (`imagegen check` OK, ChatGPT login). Fix for the wrapper (root-owned, `/usr/local/lib/kenmore-ops/imagegen`):
+put the prompt before the `-i` options or end the option list with `--`. Until then describe the style in words.

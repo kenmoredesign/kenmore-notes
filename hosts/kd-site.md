@@ -608,3 +608,32 @@ is `''` and, if not, WP Rocket > Settings > Save Changes; clear WP Rocket includ
 `…/kenmore/js/scripts.js` at Cloudflare only if a page still loads it unversioned; check the tag manager snippet shows
 `type="text/plain" data-kd-consent="tags"` in the page source; robots.txt is a separate hand step (not in dev).
 Undo of the whole build on dev: restore the full backup above, or per session from `backup/` as each log describes.
+
+### 2026-11-26 (late): Alex's review of the SEO build, decisions and follow-ups
+
+Decisions (dev changes logged in ops `wordpress/seo-2026-11/build/orchestrator/CHANGES.md`, "first review round"):
+- Header drop-in animation stays. Home slider: no slide-1 illustration on phones (≤767 px), desktop unchanged.
+- Cookie banner as built (Reject / Accept only). `firstPage` and `refSite` cookies stay set before a choice.
+- Company facts (Alex): Kenmore Design LLC, founded 2007-08-30, +1 617 381 4865; offices 189 The Strand, 3rd Floor, Gzira
+  GZR 1024, Malta and 276 Fifth Avenue, Suite 704, New York, NY 10001 (shared space; the Google Business Profile for the
+  US entity still shows an older Boston address and Alex is undecided about it). Profiles: LinkedIn
+  `company/kenmore-design-llc`, X `kenmoredesign`, Facebook `successasaservice`, YouTube `kenmoredesign`.
+  "2.5M+ users daily" is the right figure (not 1.5 million); 19 years (not 18). Main platforms MT4, MT5, cTrader,
+  TradeLocker; DXtrade, Match-Trader and xOpenHub may be named but get no logos (partly competitors).
+- The pictures on the two Agentic CRM pages are illustrations, not product screens.
+- Test leads on dev are allowed.
+
+Follow-ups, not built:
+- **About 2026-12-10 (two weeks after the build): plan item 8, option (a).** `/forex-solutions/forex-crm/` (page 421) heading
+  and title start with "Forex CRM"; `/forex-solutions/forex-crm-system-explained/` gets a narrower title and a link to the
+  product page; no redirect; 12 languages. Evidence and wording in ops `wordpress/seo-2026-11/PLAN.md` item 8 and
+  `audit/out/AUDIT.md` finding 2. Only after the rollout of the build has been measured.
+- **Referrer to SendPulse:** the handler now reads `refSite` and stores it in the lead log (`_request.ref_site`). To send it:
+  create a text contact attribute "Referrer" in SendPulse, then add `'ref_site' => ['name' => 'Referrer', 'type' => 3]` to
+  `$attr_map` in `sage/app/actions.php`.
+- **Text corrections (need Alex's yes, body copy):** "18 years" / "18+ years" on about 57 English pages (case studies,
+  partner pages, about-us, hiring, agentic pages …) should read 19; "1.5 million users" on 8 English pages (six case
+  studies and two 2022 posts) against "2.5M+" elsewhere. Each English save queues 11 translations.
+- **Delete in SendPulse:** test contact "SEO CacheTest" (`seo-cachetest@kenmoredesign.com`), dev lead-log row 60.
+- robots.txt on www (prepared change, hand step), the real tag-manager test on dev, a full "after" backup of dev (root
+  window), canonical re-crawl on www after the rollout (dev prints no canonical while `blog_public` is 0).
