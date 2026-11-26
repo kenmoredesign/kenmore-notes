@@ -2,6 +2,8 @@
 
 Company site on kd-site: live `kdsites/site` (DB `kenmore_sage`), staging `dev.kenmoredesign.com`
 `kdsites/dev` (DB `kenmore_dev`). Host details in `hosts/kd-site.md`.
+SEO data (Search Console, GA4, PageSpeed/CrUX, PostHog) is readable from Ops through the
+claude-seo plugin since 2026-11-26: setup in `hosts/ops.md`, section claude-seo.
 
 ## Workflow
 Content is edited and translated on dev, then deployed: `~/ops/kdsites/refresh-dev-from-live.sh`

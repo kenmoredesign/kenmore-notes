@@ -77,3 +77,23 @@ After that, revoke `OPS-IMAGEGEN` in the LB dashboard and sign the Ops device ou
 - ~~Default-on agent tools beyond the shell.~~ **Closed in v7** (`b0c3d4a`). The wrapper also disables `unified_exec`, `view_image`, `multi_agent`, `apps`, `plugins` and `hooks`. alex verified on codex 0.165.0 that `shell_tool` alone already removes `exec_command`. The remaining nested tools are the image tool, `apply_patch` (model-authored text only), goals and MCP resource listing with no servers configured.
 - ~~`--ref` accepts any path the imagegen user can read.~~ **Closed in v7** (`b0c3d4a`). Its realpath must be under `/srv/imagegen/in/`.
 - Smaller, untested: `in/` is writable by `claude`, and the wrapper checks the ref's realpath but passes the unresolved path to `codex -i`. A session could swap a checked file for a symlink to `auth.json` between the check and Codex reading it. Codex's image loader would most likely reject the file. To close it, copy each ref into a private temp file (opened with `O_NOFOLLOW`) after the check and pass that copy.
+
+## claude-seo: Google and PostHog connections (2026-11-26)
+
+The claude-seo plugin (2.6.2, `~/.claude/plugins/cache/agricidaniel-claude-seo/`) can read real
+data for kenmoredesign.com. All four were live-tested on 2026-11-26.
+
+- **Google** (Search Console, GA4, PageSpeed, CrUX). Files in `~/.config/claude-seo/` (700, files 600):
+  - `service_account.json`: service account `kenmore-seo@kenmore-seo-515714.iam.gserviceaccount.com`,
+    Cloud project `kenmore-seo-515714`. Search Console: Full user on `sc-domain:kenmoredesign.com`.
+    GA4: Viewer on property `381359430`. No Indexing API (needs Owner).
+  - `google-api.json`: `service_account_path`, `api_key` (restricted to PageSpeed + CrUX; replaced
+    2026-11-26 after the first one showed in a session log) and a `sites` map:
+    `kenmoredesign.com` → `sc-domain:kenmoredesign.com` + `properties/381359430`.
+  - Check: `<plugin>/scripts/claude-seo run google_auth.py --check` (Tier 2, Full). Scripts take
+    `--domain kenmoredesign.com` (`gsc_query.py`, `ga4_report.py`, `pagespeed_check.py <url>`).
+- **PostHog** (US cloud): MCP server `posthog` at `https://mcp.posthog.com/mcp`, user scope in
+  `~/.claude.json` with a read-only `phx_` personal API key as a Bearer header. Tool
+  `mcp__posthog__exec` (`call execute-sql` for HogQL). A session started before the server was
+  added doesn't see the tool; restart Claude Code. PostHog counts include `dev.` test traffic.
+- Don't print the key files or `~/.claude.json` into a session: mask keys when checking.
