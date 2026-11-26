@@ -485,8 +485,8 @@ No separate notes checkout was found.
   (`redirect-redirection`) has no CLI but its rules are plain rows: `wp_irrp_redirections` (from, match, to, status,
   timestamp, type `redirection`; relative paths) plus 16 `wp_irrp_redirectionmeta` rows per rule (copy from an
   existing rule). A rule added with `wp <site> db query` works at once, no cache to clear. New rule id 37 on both;
-  undo in ops `wordpress/forex-mobile-app/CHANGES.md`. Rule 16 `/solutions/mobile-solutions/` still goes to
-  `/forex-solutions/`. This corrects the 2026-11-12 line saying the plugin can only be driven from wp-admin.
+  undo in ops `wordpress/forex-mobile-app/CHANGES.md`. Rule 16 `/solutions/mobile-solutions/` was retargeted to the new page too (was
+  `/forex-solutions/`). This corrects the 2026-11-12 line saying the plugin can only be driven from wp-admin.
 - kma v13 (2026-11-25): `.wrapper:has(.kma){overflow-y:clip}`; v5's `overflow:visible` (needed for sticky pinning) let
   the theme's footer leaf (`.footer:after`, `bottom:-100px` under 992 px) add a 100 px white band on phones. v12 → v13
   reached 20276 and the 22 translations by a DB-level `search-replace` of the two asset URLs, not by translation jobs,
