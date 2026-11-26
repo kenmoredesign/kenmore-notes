@@ -567,3 +567,44 @@ Nothing was changed on www or dev by the audit.
 - **Side effects of the audit on www:** one WP Rocket cache file written for `/fr/forex-solutions/forex-crm/`, about
   100 anonymous visitor records in Chatwoot from browser loads, one home-page load with analytics beacons allowed.
 - kd-site disk on 2026-11-26: 11 GB free of 75 GB (86%); a full dev backup is 2.7 GB.
+
+### 2026-11-26 19:40–22:00 UTC: SEO build on dev (approved by Alex; dev only, nothing on www)
+
+Plan: ops `wordpress/seo-2026-11/PLAN.md`. Built by five sandboxed sessions; each kept a replay log with before/after
+copies of every file: ops `wordpress/seo-2026-11/build/<name>/CHANGES.md`, `backup/` (before) and `after/` (final, the
+replay source). Full dev backup from before: `/var/backups/kenmore-ops/kdsites/seo-2026-11/dev-full-before-2026-11-26_142524.zip`.
+Alex decided: one build on dev, one rollout to www later; the Forex CRM title/H1 change (plan item 8) is a later round.
+
+| What | Files and settings on dev | Log |
+|---|---|---|
+| Stubs + include | `sage/resources/functions.php` line 62 lists `'seo-schema', 'consent', 'blog'`; three new files in `sage/app/` | `build/orchestrator/CHANGES.md` |
+| Cached page for every visitor | `polylang` option `browser` 0 (was true); `sage/app/setup.php` (no per-visitor values printed, no PHP `setcookie`, theme CSS/JS versioned by file time, local font CSS), `sage/app/actions.php` (`send_message` reads IP/country/city/timezone from the request, first page/referrer from cookies), `sage/resources/assets/actions.js` (sets `firstPage`/`refSite` cookies), new `resources/assets/fonts/roboto/` | `build/cache/CHANGES.md` |
+| CRM page freeze + first screen | `views/template-forex-crm.blade.php` (line script rewritten), `partials/head.blade.php` (inline CSS), `assets/kenmore/js/scripts.js`, `partials/content-home.blade.php`, hero block of 11 more templates | `build/first-screen/CHANGES.md` |
+| Structured data | `sage/app/seo-schema.php` (Yoast `wpseo_schema_graph` filter: one Organization/WebSite id from the default-language home URL; output buffer adds SoftwareApplication on pages 421, 5115, 19488, 19550 and translations) | `build/schema/CHANGES.md` |
+| Blog index | `sage/app/blog.php`, `views/template-blog.blade.php`, `template-blog-card.blade.php`, `assets/kenmore/css/blog-index.css`; `_wp_page_template` = `views/template-blog.blade.php` on pages 23, 11146–11152, 12845, 17366, 18095, 18096; WebP card images generated on first view into `uploads/kd-blog/` | `build/blog/CHANGES.md` |
+| Cookie banner | `sage/app/consent.php`, `assets/kenmore/js/consent.js`, `css/consent.css`; strings in Polylang (group "Cookie banner"); dev-only stand-ins in `auhfc_settings_sitewide` (`GTM-DEVTEST1`, chat token `DEVTEST…`) | `build/consent/CHANGES.md` |
+
+Facts learned (durable):
+- **WP Rocket never rebuilds a minified CSS/JS copy** (`wp-content/cache/min/1/<source path>`) while the copy exists; the
+  `?ver=` on it is the copy's mtime. After a direct edit of a theme CSS/JS file the optimised page keeps the old code.
+  There is no wp-cli command for it and the folders are www-data only. The deploy empties `wp-content/cache/`, so www
+  is covered by a deploy; on dev use ops `wordpress/seo-2026-11/build/tools/purge-dev-cache` (runs WP Rocket's
+  settings-save path with `wp --context=admin`: adds and removes a dummy `exclude_js`/`exclude_css` entry, then lets a
+  web request rewrite the config file). Page cache only: `wp dev term update category 104 --name=Uncategorized`.
+- **A WP Rocket config file written from wp-cli lacks `$rocket_cache_query_strings = array('q')`** (nginx is not
+  detected in CLI). To get the web-written file: move it aside and request `/wp-admin/admin-post.php` once.
+- **Polylang `browser` off needs two saves from wp-cli** (`false`, then `0`): WP Rocket's hook decides with the value
+  still in memory, so the first save writes the old `pll_language` line again.
+- `wp --context=admin` passes the ops `wp` wrapper and loads admin-only hooks.
+- The "Head & Footer Code" option `auhfc_settings_sitewide` is kept per host by the deploy, so tag gating has to be
+  theme code (it is: `consent.php` rewrites the plugin's output, found by its class namespace `Techwebux\Hfc\`).
+- `/ku/` is left-to-right on this site (Kurmanji, Latin letters; Polylang locale `ckb`, rtl off).
+- `/ja/forex-solutions/agentic-forex-crm/` (post 19503) prints "Array" 43 times on www and dev (failed translation of
+  a field), since before this job.
+- Cached pages no longer set cookies from PHP, so nothing stops Cloudflare from caching HTML later.
+
+On www at rollout (beyond what the deploy carries): check `grep mandatory_cookies wp-content/wp-rocket-config/www.kenmoredesign.com.php`
+is `''` and, if not, WP Rocket > Settings > Save Changes; clear WP Rocket including minified files; purge
+`…/kenmore/js/scripts.js` at Cloudflare only if a page still loads it unversioned; check the tag manager snippet shows
+`type="text/plain" data-kd-consent="tags"` in the page source; robots.txt is a separate hand step (not in dev).
+Undo of the whole build on dev: restore the full backup above, or per session from `backup/` as each log describes.
