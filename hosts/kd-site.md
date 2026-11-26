@@ -502,3 +502,24 @@ No separate notes checkout was found.
 - Theme gotcha: `.tick-list,.tpg ul { align-items:flex-start }` stops grid children stretching; and `.tpg ul li { align-items:center }` reaches into custom list-based cards inside page content.
 - YourProp demo captures: the capture agent's "full-length" stitch can silently fall back to one screen
   (2205 px). Ask it to report pixel heights.
+
+### 2026-11-26: SEO review job (ops `wordpress/seo-2026-11/`), Phase 0
+
+- **Drift check dev vs www, 13:52 UTC: dev is not behind.** Identical: core 7.0.9, every post row (4,326, hashed
+  title|content|excerpt|parent|menu_order with dev.→www.), postmeta (499,615 rows, edit locks left out), terms (498),
+  uploads (5,350 files by size), plugin versions (29), `wp-content/{themes,plugins,mu-plugins}` (17,304 files by md5)
+  except `sage/app/filters.php` and `sage/app/walker.php` (dev ahead: the forex icon-row fix of 2026-11-25).
+  Expected per-site differences only: `broken-link-checker` active on www, inactive on dev; options `blog_public`
+  (dev 0), `auhfc_settings_sitewide` (www 1361 bytes with GTM, dev 250: **dev loads no GTM, so no GA4/PostHog/Clarity
+  tags run on dev**), `wp_rocket_settings`, `acf_pro_license*`, cron, `kd_calendly_webhook_log` (www only). Webroot:
+  dev has `.cache/`, a 4343-byte `.htaccess` (www 199; nginx ignores both) and the 28-byte `robots.txt` (www 436).
+  Method (repeatable, read-only): the queries and file lists are in ops `wordpress/seo-2026-11/README.md`.
+- **dev before the lock (13:50 UTC):** indexing was held off by three things, all outside nginx: the physical
+  `robots.txt` (`Disallow: /`, writable by claude), `blog_public` 0 (meta robots `noindex, nofollow`, in the database)
+  and Yoast's `X-Robots-Tag: noindex, follow` on sitemaps. No `X-Robots-Tag` on pages, static files, `llms.txt` or
+  errors. Cloudflare caches `/robots.txt` (cf-cache-status HIT, max-age 691200).
+- **Staged, not run (needs a root window):** `phase0/dev-seo-lock.sh` (nginx: `X-Robots-Tag "noindex, nofollow"
+  always` on every response of the dev vhost, PHP's own header hidden, `/robots.txt` answered by nginx with
+  `Disallow: /`) and `phase0/dev-full-backup.sh` (zip of the dev tree + `wp db export`, to
+  `/var/backups/kenmore-ops/kdsites/seo-2026-11/`). Both are fed over ssh (`ssh root@kd-site 'bash -s -- --run' <
+  script`), dry run without `--run`. Update this entry when they have run.

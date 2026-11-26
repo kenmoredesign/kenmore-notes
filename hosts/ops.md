@@ -97,3 +97,18 @@ data for kenmoredesign.com. All four were live-tested on 2026-11-26.
   `mcp__posthog__exec` (`call execute-sql` for HogQL). A session started before the server was
   added doesn't see the tool; restart Claude Code. PostHog counts include `dev.` test traffic.
 - Don't print the key files or `~/.claude.json` into a session: mask keys when checking.
+
+## Sandboxed agents and the SEO plugin (2026-11-26)
+
+An `agent-run` terminal has no plugins, no `~/.config/claude-seo` keys, no PostHog MCP server and no Playwright
+browser (none of those paths are mounted). For the kenmoredesign.com SEO audit the arrangement was:
+- the orchestrator session pulls Search Console, GA4, CrUX, PSI and PostHog data into the job folder (`data/`);
+  the sandboxed agent asks for more through a `REQUESTS.md` file. Keys never enter the sandbox.
+- the plugin is loaded from a copy in the job folder: `claude --plugin-dir <job>/tools/claude-seo` (copy of
+  `~/.claude/plugins/cache/agricidaniel-claude-seo/claude-seo/<version>`).
+- a browser works inside bubblewrap from copies of `~/.cache/ms-playwright` and `~/ops/tools/node_modules` in the
+  job folder, with `PLAYWRIGHT_BROWSERS_PATH=<job>/tools/ms-playwright` (checked: headless Chromium loads www).
+  `tools/` is 690 MB and git-ignored in the job folder.
+- `--permission-mode auto` so the agent is not stopped at every command. It cannot `hc send` (no hc inside): it
+  reports through a status file, and the orchestrator reads its screen with `hc read`.
+Run `agent-sandbox --job <dir> -- bash -c '<probe>'` from your own shell to test what the sandbox can do.
