@@ -522,4 +522,13 @@ No separate notes checkout was found.
   always` on every response of the dev vhost, PHP's own header hidden, `/robots.txt` answered by nginx with
   `Disallow: /`) and `phase0/dev-full-backup.sh` (zip of the dev tree + `wp db export`, to
   `/var/backups/kenmore-ops/kdsites/seo-2026-11/`). Both are fed over ssh (`ssh root@kd-site 'bash -s -- --run' <
-  script`), dry run without `--run`. Update this entry when they have run.
+  script`), dry run without `--run`.
+- **2026-11-26 14:25–14:27 UTC (root window): full dev backup taken** with `dev-full-backup.sh --run`:
+  `/var/backups/kenmore-ops/kdsites/seo-2026-11/dev-full-before-2026-11-26_142524.zip` (2,707,473,010 bytes, 35,722
+  entries, root 600, `unzip -t` passed, sha256 9774a680…feaf4811 in the `.sha256` beside it; log line in
+  `backups.log` there). It holds the dev tree without `*/cache/*` plus the dump `dev-seo-before-2026-11-26_142524.sql`
+  (316 MB). dev stayed up. Free space after: about 11 GB. Restore (root, dev in maintenance mode first):
+  `unzip -p <zip> dev-seo-before-2026-11-26_142524.sql | sudo -u www-data wp --path=/var/www/html/kdsites/dev db import - --default-character-set=utf8mb4`,
+  then `unzip -o -q <zip> -x dev-seo-before-2026-11-26_142524.sql -d /var/www/html/kdsites/dev`.
+- **The nginx lock script has NOT been run** (Alex, 2026-11-26: "make sure not to run that script"). dev's
+  nginx vhost is unchanged; dev is still held out of indexes only by the webroot `robots.txt` and `blog_public` 0.
