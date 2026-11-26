@@ -530,5 +530,16 @@ No separate notes checkout was found.
   (316 MB). dev stayed up. Free space after: about 11 GB. Restore (root, dev in maintenance mode first):
   `unzip -p <zip> dev-seo-before-2026-11-26_142524.sql | sudo -u www-data wp --path=/var/www/html/kdsites/dev db import - --default-character-set=utf8mb4`,
   then `unzip -o -q <zip> -x dev-seo-before-2026-11-26_142524.sql -d /var/www/html/kdsites/dev`.
-- **The nginx lock script has NOT been run** (Alex, 2026-11-26: "make sure not to run that script"). dev's
-  nginx vhost is unchanged; dev is still held out of indexes only by the webroot `robots.txt` and `blog_public` 0.
+- **2026-11-26 14:38 UTC (root window): dev is locked in nginx, permanently.** `dev-seo-lock.sh --run` rewrote
+  `/etc/nginx/sites-available/dev` (sha256 c9e10f7e… → 1067b8e0…; backup `/root/nginx-bak-dev-20261126-143804`),
+  `nginx -t` ok, reloaded. Now: `add_header X-Robots-Tag "noindex, nofollow" always;` at server level in the 443
+  block, repeated in `location = /robots.txt`, in the `.apk` location (locations with their own `add_header` do not
+  inherit) and in the port-80 block; `fastcgi_hide_header X-Robots-Tag;` in both PHP locations (Yoast's sitemap
+  header no longer doubles it); `/robots.txt` is `return 200 "User-agent: *\nDisallow: /\n"` from nginx, so **the
+  webroot `robots.txt` is no longer read**: the 11-11/11-13 way of opening dev for a crawler (editing that file) no
+  longer works, and `~/bin/dev-robots-revert.sh` is obsolete. Checked at the origin (15 URLs incl. 403/404, one
+  header each, port 80 too) and through Cloudflare. Static files Cloudflare cached before 14:38 keep their old
+  headers until they expire or dev is purged. Lighthouse's SEO "is crawlable" check will always fail on dev: expected.
+  Any new `location` with its own `add_header` in this vhost must repeat the X-Robots-Tag line.
+  Undo: `ssh root@kd-site 'cat /root/nginx-bak-dev-20261126-143804 > /etc/nginx/sites-available/dev && nginx -t && systemctl reload nginx'`.
+  The deploy script named in Alex's "make sure not to run that script" was `deploy-dev-to-live.sh`; it was only read, never run.
