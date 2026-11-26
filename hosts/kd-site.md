@@ -631,9 +631,12 @@ Follow-ups, not built:
 - **Referrer to SendPulse:** the handler now reads `refSite` and stores it in the lead log (`_request.ref_site`). To send it:
   create a text contact attribute "Referrer" in SendPulse, then add `'ref_site' => ['name' => 'Referrer', 'type' => 3]` to
   `$attr_map` in `sage/app/actions.php`.
-- **Text corrections (need Alex's yes, body copy):** "18 years" / "18+ years" on about 57 English pages (case studies,
-  partner pages, about-us, hiring, agentic pages …) should read 19; "1.5 million users" on 8 English pages (six case
-  studies and two 2022 posts) against "2.5M+" elsewhere. Each English save queues 11 translations.
+- **Text corrections: done on dev 2026-11-27** (Alex approved the narrow route): 18 -> 19 years and 1.5 -> 2.5 million
+  users in 794 stored texts of 68 English pages and their translations, number only, no post saved, no re-translation
+  (ops `wordpress/seo-2026-11/textfix/`, log in `build/orchestrator/CHANGES.md`). Left for Alex: the Forex listicle
+  (post 20045) still says about Kenmore that its pages show "19+ years" on one and "18+ years" on another.
+- **LinkedIn Insight tag:** Alex wants it removed. It is inside the tag manager container GTM-TZW9SC6J, not on the
+  site: he removes it there.
 - **Delete in SendPulse:** test contact "SEO CacheTest" (`seo-cachetest@kenmoredesign.com`), dev lead-log row 60.
 - robots.txt on www (prepared change, hand step), the real tag-manager test on dev, a full "after" backup of dev (root
   window), canonical re-crawl on www after the rollout (dev prints no canonical while `blog_public` is 0).
