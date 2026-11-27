@@ -716,3 +716,15 @@ and description (the logged re-translation of post 19503); `PostalAddress` on ev
 on 48. Still open at 15:57 UTC: the WP Rocket config on www requires `pll_language` (file dated 2026-10-22), so
 all 2,826 responses were uncached. Open list: ops `wordpress/seo-2026-11/OPEN-ITEMS.md`; brief for the next
 review round: `NEXT-AUDIT-PROMPT.md` in the same folder (not before 2026-12-10).
+
+### 2026-11-27 16:15 UTC: how to make WP Rocket rewrite its config on www (correction)
+
+"WP Rocket > Settings > Save Changes" (written above twice) is wrong for WP Rocket 3.22: the Dashboard tab has no
+save button, and `rocket_after_save_options` (`inc/admin/options.php:83`) hangs on `update_option_wp_rocket_settings`,
+which WordPress fires only when the stored value changes. On dev the file was rewritten because the build changed
+Polylang's `browser` option through WordPress (`pre_update_option_polylang` hook in
+`inc/3rd-party/plugins/i18n/polylang.php`); the deploy copies the database, so no hook ran on www. Way that works:
+change any real setting and save (e.g. Advanced Rules > "Never Cache URL(s)": add `/kd-save-test/`, Save Changes,
+remove it, Save Changes), then Clear and preload. With Polylang `browser` = 0 (www: 0) the rewritten file has
+`$rocket_cache_mandatory_cookies = ''`. The plugin has no WP-CLI command. Also seen in Alex's screenshot: the
+WP Rocket licence on www expired 2026-05-02 ("error updating the plugin"); version 3.22.0.2.
