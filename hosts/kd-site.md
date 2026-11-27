@@ -706,3 +706,13 @@ Follow-ups, not built:
 - LinkedIn tag still in the GTM container. Test lead on www not sent (no go-ahead).
 - Open items of the job: ops `wordpress/seo-2026-11/OPEN-ITEMS.md`. Brief for the next review round (not before
   2026-12-10, better from 2026-12-28): `wordpress/seo-2026-11/NEXT-AUDIT-PROMPT.md`.
+
+### 2026-11-27 15:57 UTC: www crawl after the deploy
+
+All 2,826 audit URLs re-crawled on www and compared with the audit crawl (ops
+`wordpress/seo-2026-11/build/orchestrator/verify/crawl-www-after/`): all 200; canonical, hreflang, H1, robots
+and language attributes unchanged on every URL; only `/ja/forex-solutions/agentic-forex-crm/` has a new title
+and description (the logged re-translation of post 19503); `PostalAddress` on every page, `SoftwareApplication`
+on 48. Still open at 15:57 UTC: the WP Rocket config on www requires `pll_language` (file dated 2026-10-22), so
+all 2,826 responses were uncached. Open list: ops `wordpress/seo-2026-11/OPEN-ITEMS.md`; brief for the next
+review round: `NEXT-AUDIT-PROMPT.md` in the same folder (not before 2026-12-10).
