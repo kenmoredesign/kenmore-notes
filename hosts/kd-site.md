@@ -651,3 +651,19 @@ Follow-ups, not built:
   archives of about 2.5 GB each (`dev.zip` 2026-07-20, three `dev-backup-*` of October, seven `live-restorepoint-*` from
   2026-10-21 to 2026-11-25) plus the two of this job. A deploy writes another live restore point of about 2.5 GB.
   Nothing was deleted; which old archives may go is Alex's call.
+
+### 2026-11-27 00:03 UTC: robots.txt on www changed (the only www change of the SEO job; Alex: "go ahead with robots.txt on www")
+- **Why:** Alex's live URL test in Search Console showed 29 of 159 page resources not loaded, the site's own CSS and JS
+  among them as "Googlebot blocked by robots.txt" (`/wp-content/cache/…`, `/wp-includes/…`, and everything with `?ver=`).
+- **What:** `/var/www/html/kdsites/site/robots.txt`: lines `Disallow: /wp-includes/` and `Disallow: /wp-content/cache/`
+  removed, `Disallow: /*?*` became `Disallow: /*?s=`. Everything else unchanged (CRLF line endings, owner
+  www-data:www-data, mode 775). New md5 = ops `wordpress/seo-2026-11/rollout/robots.txt.www-new`.
+- **How:** root window, `ssh root@kd-site 'bash -s -- --run' < wordpress/seo-2026-11/rollout/www-robots-apply.sh`
+  (checks the old md5, backs up, writes, verifies, prints what the origin serves).
+- **Backup and undo:** `/var/backups/kenmore-ops/kdsites/seo-2026-11/robots.txt.www-before-2026-11-27_000346`;
+  `cat <that file> > /var/www/html/kdsites/site/robots.txt` as root.
+- **Cloudflare** caches `/robots.txt` for 8 days (`max-age=691200`): until Alex purges that URL, visitors and crawlers
+  can still get the old file from the edge. The origin serves the new one (checked with `--resolve` on the host).
+- Internal search (`/?s=`), `/wp-admin/`, `/wp-login.php`, `/feed/` stay disallowed. URLs with tracking parameters are
+  crawlable now; they carry a canonical to the clean URL.
+- The file is in the deploy's PRESERVE list, so a later deploy does not touch it.
