@@ -691,3 +691,18 @@ Follow-ups, not built:
   badges say p.m.), half-translated "ROOM FOR GROWTH" / "READY TO FUND" badges, right-to-left pages keep the
   left-to-right step layout.
 - dev's full "after" archive (2026-11-26 23:59) predates these three theme-file changes.
+
+### kenmoredesign.com, 2026-11-27: SEO build rolled out to www by Alex (about 14:30–14:50 UTC)
+
+- Checked 15:00 UTC, read-only: ten key theme files identical on www and dev; Polylang `browser` 0; `blog_public` 1;
+  `kt_auto` 1; canonical printed; Organization markup with legal name and founding date; SoftwareApplication on
+  the Forex CRM page; tag-manager and chat snippets held back (`type="text/plain" data-kd-consent`), real
+  container GTM-TZW9SC6J; banner test with beacons aborted: nothing third-party before a choice or after Reject
+  except `cdnjs.cloudflare.com` (jquery-validate, only in the uncached page), trackers and chat after Accept;
+  timeline pages render the same cached and uncached; `/blog/` and `/blog/page/2/` answer 200 in 12 languages.
+- **Still wrong at 15:00 UTC:** `wp-rocket-config/www.kenmoredesign.com.php` has
+  `$rocket_cache_mandatory_cookies = 'pll_language'` (the deploy does not carry this file). Cookieless visits are
+  uncached (0.52–0.57 s). Needs WP Rocket > Save Changes, then Clear and preload. Lighthouse on www waits for it.
+- LinkedIn tag still in the GTM container. Test lead on www not sent (no go-ahead).
+- Open items of the job: ops `wordpress/seo-2026-11/OPEN-ITEMS.md`. Brief for the next review round (not before
+  2026-12-10, better from 2026-12-28): `wordpress/seo-2026-11/NEXT-AUDIT-PROMPT.md`.
