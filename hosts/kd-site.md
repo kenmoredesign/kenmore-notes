@@ -743,3 +743,12 @@ WP Rocket licence on www expired 2026-05-02 ("error updating the plugin"); versi
   the LCP element at 3.1 s.
 - LinkedIn Insight tag: at 22:19 UTC the published container GTM-TZW9SC6J was still version 11 with the tag
   (`__bzi`, partner ID 290642); Alex had removed it in the workspace. Needs Submit > Publish.
+
+### 2026-11-27 22:55 UTC: round 3 on dev (`polish`), not yet on www
+
+dev differs from www in two theme files (ops `wordpress/seo-2026-11/build/polish/CHANGES.md`, backups there):
+`sage/app/blog.php` (`blog_img_tag()` prints `alt=""`; md5 `bbf6bda157aafaf1c5514cf65fa1f835`) and
+`sage/resources/views/partials/content-home.blade.php` (line 38, `data-no-lazy="1"` on the background under the
+hero; md5 `62f20c56f5b34b62c18581cb23628717`). Verified on dev (card images `alt=""` in 4 languages; phone home LCP
+3.1 → 2.6 s; screenshots pixel-identical). Reaches www with Alex's next deploy, then a WP Rocket cache clear.
+`~/polish-lint/` in claude's home on kd-site is a leftover lint helper of that session.
