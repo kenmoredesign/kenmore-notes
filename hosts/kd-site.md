@@ -728,3 +728,18 @@ change any real setting and save (e.g. Advanced Rules > "Never Cache URL(s)": ad
 remove it, Save Changes), then Clear and preload. With Polylang `browser` = 0 (www: 0) the rewritten file has
 `$rocket_cache_mandatory_cookies = ''`. The plugin has no WP-CLI command. Also seen in Alex's screenshot: the
 WP Rocket licence on www expired 2026-05-02 ("error updating the plugin"); version 3.22.0.2.
+
+### 2026-11-27 22:45 UTC: www after the WP Rocket config rewrite
+
+- Alex made a real settings change in WP Rocket on www at 22:16 UTC; the config now has
+  `$rocket_cache_mandatory_cookies = ''`. Cookieless first visit: cached page in 0.09–0.14 s on desktop and phone
+  (0.52–0.61 s before). Banner on the cached page: no request outside www before a choice or after Reject.
+- Lighthouse 13.6 on www (median of 3, 22:20–22:35 UTC): phone 99 on six baseline pages, 86 on the home page
+  (before 44–72); desktop 100 on all seven (before 54–90). Table: ops `wordpress/seo-2026-11/REPORT.md`.
+- Two defects of the build found by it, fix session `polish` started on dev (ops
+  `wordpress/seo-2026-11/build/polish/`): `blog_img_tag()` in `sage/app/blog.php` drops the empty `alt` attribute
+  (its print loop skips empty values); on the phone home page the background of the section under the hero
+  (`prop-firm-web-solutions-bg.svg`, 804 bytes) reaches 113 px into the first screen and is lazy-loaded, so it is
+  the LCP element at 3.1 s.
+- LinkedIn Insight tag: at 22:19 UTC the published container GTM-TZW9SC6J was still version 11 with the tag
+  (`__bzi`, partner ID 290642); Alex had removed it in the workspace. Needs Submit > Publish.
