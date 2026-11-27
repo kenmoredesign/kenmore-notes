@@ -640,3 +640,14 @@ Follow-ups, not built:
 - **Delete in SendPulse:** test contact "SEO CacheTest" (`seo-cachetest@kenmoredesign.com`), dev lead-log row 60.
 - robots.txt on www (prepared change, hand step), the real tag-manager test on dev, a full "after" backup of dev (root
   window), canonical re-crawl on www after the rollout (dev prints no canonical while `blog_public` is 0).
+
+### 2026-11-26 23:59 UTC: full backup of dev after the SEO build; disk space
+- `/var/backups/kenmore-ops/kdsites/seo-2026-11/dev-full-after-2026-11-26_235914.zip` (2,718,279,938 bytes, 36,094 entries,
+  dump 316 MB inside, sha256 584b1313…e4b07d84), made with ops `wordpress/seo-2026-11/phase0/dev-full-backup.sh --run after`.
+  It includes the review round (header animation back, no slide-1 picture on phones, company facts in the markup), the
+  number corrections (18 -> 19 years, 1.5 -> 2.5 million, 12 languages, no post saved), the Japanese agentic page
+  re-translation and the two new listicle hero images (attachments 20386, 20387). The "before" backup of 14:25 is beside it.
+- **Disk after it: 8.0 GB free of 75 GB (89%).** `/var/backups/kenmore-ops/kdsites/` holds 33 GB: eleven older full
+  archives of about 2.5 GB each (`dev.zip` 2026-07-20, three `dev-backup-*` of October, seven `live-restorepoint-*` from
+  2026-10-21 to 2026-11-25) plus the two of this job. A deploy writes another live restore point of about 2.5 GB.
+  Nothing was deleted; which old archives may go is Alex's call.
