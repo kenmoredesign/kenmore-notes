@@ -667,3 +667,27 @@ Follow-ups, not built:
 - Internal search (`/?s=`), `/wp-admin/`, `/wp-login.php`, `/feed/` stay disallowed. URLs with tracking parameters are
   crawlable now; they carry a canonical to the clean URL.
 - The file is in the deploy's PRESERVE list, so a later deploy does not touch it.
+
+### kenmoredesign.com, 2026-11-27: SVG images blown up in the cached page (WP Rocket), round 2 on dev
+
+- **Mechanism (applies site-wide, www and dev):** WP Rocket's "Add missing image dimensions" (`image_dimensions` = 1)
+  writes `width`/`height` on every `<img>` that has none when it builds the cached page. For an SVG it takes the
+  numbers from the viewBox. SVGs exported with `width="100%" height="100%"` have no natural size, so the cached page
+  gets e.g. `width="3289" height="2336"` and the image renders at that size unless theme CSS sets a width.
+  Logged-in users and `?nc=` requests get no WP Rocket output, so the page looks right to an editor. The numbers are
+  rewritten at every cache rebuild (page save, cache clear, 24 h cron), which is why manual fixes never held.
+- **Trader's Room (page 31) and Prop Firm Dashboard (5118), template `template-traders-room.blade.php`:** fixed on
+  dev in the theme: `main.css` block `kd:timeline` (`.timeline-section.traders-room .sub-image img{width:auto;height:auto}`,
+  right-to-left geometry, phone and tablet layout of the timeline) and `data-no-lazy` on the dotted-line images.
+  Replay: ops `wordpress/seo-2026-11/build/timeline/CHANGES.md`. Not on www until the deploy.
+- **Solutions hubs (pages 10, 4268), `template-solutions.blade.php`:** first two cards without `wow fadeInUp`
+  (`build/solutions-cards/CHANGES.md`).
+- **Same cause elsewhere (40 English pages checked, not changed):** contact page WhatsApp/Telegram icons 60 px
+  cached against 90 px; some menu icons 25 against 35 px; phone header logo box 231 against 151 px wide. Nothing
+  broken. Before judging any image size on this site, compare the plain URL with `?nc=1`.
+- **Check a new SVG before using it in a template:** if its root tag has `width="100%"`, give the `<img>` a CSS
+  width or export it with pixel sizes.
+- **Open, Alex to decide (`build/timeline/QUESTIONS.md`):** time-badge wording in tr/ar/ko translations (Turkish
+  badges say p.m.), half-translated "ROOM FOR GROWTH" / "READY TO FUND" badges, right-to-left pages keep the
+  left-to-right step layout.
+- dev's full "after" archive (2026-11-26 23:59) predates these three theme-file changes.
